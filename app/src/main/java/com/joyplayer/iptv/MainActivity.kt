@@ -31,7 +31,7 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme(colorScheme = darkColorScheme()) { Surface(Modifier.fillMaxSize()) { App() } } }
+        setContent { MaterialTheme(colorScheme = JoyColors) { Surface(Modifier.fillMaxSize()) { AppRoot() } } }
     }
 }
 
