@@ -9,10 +9,25 @@ android {
         applicationId = "com.joyplayer.iptv"
         minSdk = 23
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        val vc = (project.findProperty("vcode") as String?)?.toIntOrNull() ?: 1
+        versionCode = vc
+        versionName = "1.0.$vc"
     }
-    buildTypes { release { isMinifyEnabled = false } }
+    val ks = rootProject.file("keystore/joyplayer.jks")
+    if (ks.exists()) {
+        signingConfigs {
+            create("joy") {
+                storeFile = ks
+                storePassword = "joyplayer123"
+                keyAlias = "joyplayer"
+                keyPassword = "joyplayer123"
+            }
+        }
+    }
+    buildTypes {
+        debug { if (ks.exists()) signingConfig = signingConfigs.getByName("joy") }
+        release { isMinifyEnabled = false }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
