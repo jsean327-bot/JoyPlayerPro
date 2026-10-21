@@ -168,7 +168,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                         Text(error ?: "", color = Color(0xFFFF8A8A))
                     }
                     else -> LazyVerticalGrid(
-                        GridCells.Adaptive(128.dp),
+                        GridCells.Adaptive(AppPrefs.posterDp.dp),
                         contentPadding = PaddingValues(12.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
