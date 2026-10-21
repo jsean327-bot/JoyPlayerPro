@@ -252,14 +252,21 @@ fun LiveScreen(
     var selUrl by rememberSaveable { mutableStateOf<String?>(null) }
     val groups = remember(all) { all.groupBy { it.group }.map { it.key to it.value.size } }
     val favCount = remember(all, favs) { all.count { it.url in favs } }
-    val shown = remember(all, favs, cat, query) {
-        all.filter { c ->
-            val inCat = when (cat) {
-                "*all*" -> true
-                "*fav*" -> c.url in favs
-                else -> c.group == cat
+    val index by produceState(emptyList<String>(), all) {
+        value = withContext(Dispatchers.Default) { all.map { normSearch(it.name + " " + it.group) } }
+    }
+    val shown = remember(all, index, favs, cat, query) {
+        val words = normSearch(query).split(' ').filter { it.isNotBlank() }
+        when {
+            words.isEmpty() -> all.filter { c ->
+                when (cat) {
+                    "*all*" -> true
+                    "*fav*" -> c.url in favs
+                    else -> c.group == cat
+                }
             }
-            inCat && (query.isBlank() || c.name.contains(query, true))
+            index.size == all.size -> all.filterIndexed { i, _ -> words.all { w -> index[i].contains(w) } }
+            else -> all.filter { c -> words.all { w -> normSearch(c.name).contains(w) } }
         }
     }
     val sel = remember(all, selUrl) { all.firstOrNull { it.url == selUrl } }
@@ -310,10 +317,18 @@ fun LiveScreen(
                         Text("${i + 1}", color = C.Text.copy(alpha = 0.6f), fontSize = 12.sp, modifier = Modifier.width(36.dp))
                         AsyncImage(ch.logo, null, Modifier.size(28.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(
-                            ch.name, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                            fontSize = 14.sp, modifier = Modifier.weight(1f)
-                        )
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                ch.name, color = Color.White, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis, fontSize = 14.sp
+                            )
+                            if (query.isNotBlank()) {
+                                Text(
+                                    ch.group, color = C.Text.copy(alpha = 0.7f), maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis, fontSize = 11.sp
+                                )
+                            }
+                        }
                         if (ch.url in favs) Text("★", color = Color(0xFFFFD54F))
                     }
                 }
