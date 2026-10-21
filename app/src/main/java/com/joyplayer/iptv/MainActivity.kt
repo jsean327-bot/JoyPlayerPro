@@ -33,6 +33,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         setContent { MaterialTheme(colorScheme = JoyColors) { Surface(Modifier.fillMaxSize()) { JoyApp() } } }
     }
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        if (PipState.canEnter && PipState.isEnabled(this)) PipState.enter(this)
+    }
 }
 
 @Composable
