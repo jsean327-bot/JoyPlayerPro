@@ -78,12 +78,13 @@ fun AppRoot() {
 
     fun soon() = Toast.makeText(ctx, "قريباً", Toast.LENGTH_SHORT).show()
 
-    fun openList(l: SavedList, onOk: () -> Unit = {}) {
+    fun openList(l0: SavedList, onOk: () -> Unit = {}) {
         scope.launch {
             loading = true; error = null
             try {
+                val l = SmartList.normalize(l0)
                 val res = withContext(Dispatchers.IO) {
-                    if (l.type == "m3u") M3uParser.fetch(l.url) else Xtream.load(l.server, l.user, l.pass)
+                    if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
                 }
                 channels = res; active = l; screen = "home"
                 onOk()
