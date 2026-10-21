@@ -137,7 +137,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
 
     DisposableEffect(player) {
         val l = object : Player.Listener {
-            override fun onTracksChanged(t: Tracks) { tracks = t }
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                android.widget.Toast.makeText(
+                    ctx, "Playback error: ${error.errorCodeName}", android.widget.Toast.LENGTH_LONG
+                ).show()
+            }
         }
         player.addListener(l)
         onDispose { player.removeListener(l); player.release() }
@@ -197,7 +201,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         AndroidView(
             factory = { c ->
-                PlayerView(c).apply {
+                (android.view.LayoutInflater.from(c).inflate(R.layout.player_view, null) as PlayerView).apply {
                     AppPrefs.styleSubtitles(this)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
