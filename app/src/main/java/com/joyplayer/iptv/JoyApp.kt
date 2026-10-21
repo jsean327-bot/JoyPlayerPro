@@ -51,11 +51,15 @@ fun JoyApp() {
     val scope = rememberCoroutineScope()
 
     val sortMode = AppPrefs.liveSort
-    val liveChannels = remember(channels, sortMode) {
+    val hiddenLive = AppPrefs.hidden("live", active?.id)
+    val lockedLive = AppPrefs.locked("live", active?.id)
+    val showLocked = Parental.unlocked
+    val liveChannels = remember(channels, sortMode, hiddenLive, lockedLive, showLocked) {
+        val base = channels.filter { it.group !in hiddenLive && (showLocked || it.group !in lockedLive) }
         when (sortMode) {
-            1 -> channels.sortedBy { it.name.lowercase() }
-            2 -> channels.sortedByDescending { it.name.lowercase() }
-            else -> channels
+            1 -> base.sortedBy { it.name.lowercase() }
+            2 -> base.sortedByDescending { it.name.lowercase() }
+            else -> base
         }
     }
 
@@ -132,6 +136,7 @@ fun JoyApp() {
                 )
             }
             screen == "settings" -> SettingsScreen(
+                active = active, channels = channels,
                 onBack = { screen = "home" },
                 onPlaylists = { screen = "playlists" }
             )
