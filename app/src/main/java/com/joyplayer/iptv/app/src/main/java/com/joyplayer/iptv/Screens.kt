@@ -203,7 +203,7 @@ fun HomeScreen(
                     }
                 }
                 Column(Modifier.weight(1.6f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    SideBtn("⚙  Settings", Modifier.weight(1f).fillMaxWidth(), onSoon)
+                    SideBtn("⚙  Settings", Modifier.weight(1f).fillMaxWidth()) { onNav("settings") }
                     SideBtn("⟳  Reload", Modifier.weight(1f).fillMaxWidth(), onReload)
                     SideBtn("⏻  Exit", Modifier.weight(1f).fillMaxWidth(), onExit)
                 }
@@ -276,7 +276,7 @@ fun LiveScreen(
         if (sel == null || paused) {
             player.pause()
         } else {
-            player.setMediaItem(MediaItem.fromUri(sel.url))
+            player.setMediaItem(MediaItem.fromUri(AppPrefs.fmtUrl(sel.url)))
             player.prepare()
             player.playWhenReady = true
         }
