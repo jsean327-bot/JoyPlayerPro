@@ -138,6 +138,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
 
     DisposableEffect(player) {
         val l = object : Player.Listener {
+            override fun onTracksChanged(t: Tracks) { tracks = t }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 android.widget.Toast.makeText(
                     ctx, "Playback error: ${error.errorCodeName}", android.widget.Toast.LENGTH_LONG
@@ -149,6 +150,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             player.removeListener(l)
             if (shared == null) player.release() else SharedLive.restorePreview()
         }
+    }
+
     suspend fun applyHit(h: SubHit) {
         val (file, ext) = withContext(Dispatchers.IO) { SubDl.fetch(h.url, meta, ctx.cacheDir) }
         val mime = when (ext) {
@@ -204,6 +207,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         AndroidView(
             factory = { c ->
                 (android.view.LayoutInflater.from(c).inflate(R.layout.player_view, null) as PlayerView).apply {
+                    this.player = player
                     AppPrefs.styleSubtitles(this)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
@@ -304,32 +308,4 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                             }
                         }
                     }
-                    TextButton(onClick = { key = ""; settings.key = "" }) { Text("Change API key") }
-                }
-            }
-            "quality" -> PlayerDialog("Video quality", { dialog = "" }) {
-                val vids = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
-                    .flatMap { g ->
-                        (0 until g.length).filter { g.isTrackSupported(it) }
-                            .map { Triple(g, it, g.getTrackFormat(it).height) }
-                    }
-                    .filter { it.third > 0 }
-                    .distinctBy { it.third }
-                    .sortedBy { it.third }
-                val isAuto = player.trackSelectionParameters.overrides.values
-                    .none { it.type == C.TRACK_TYPE_VIDEO }
-                Opt("Auto", isAuto) {
-                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
-                        .clearOverridesOfType(C.TRACK_TYPE_VIDEO).build()
-                    dialog = ""
-                }
-                vids.forEach { (g, i, h) ->
-                    Opt(qLabel(h), g.isTrackSelected(i) && !isAuto) {
-                        selectTrack(player, g, i); dialog = ""
-                    }
-                }
-                if (vids.size <= 1) Text("This stream offers only one quality.", color = C.Text, fontSize = 13.sp)
-            }
-        }
-    }
-}
+                    TextButton(onClick = { key = ""; settings.key = "" }) { Text("Change API
