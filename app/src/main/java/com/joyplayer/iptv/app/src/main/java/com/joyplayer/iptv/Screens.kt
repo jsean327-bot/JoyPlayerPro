@@ -42,6 +42,10 @@ object C {
     val BurgundyDark = Color(0xFF4A0E22)
     val Blue = Color(0xFF3B82F6)
     val Text = Color(0xFFEAF0FF)
+    const val TRACK_TYPE_AUDIO = androidx.media3.common.C.TRACK_TYPE_AUDIO
+    const val TRACK_TYPE_VIDEO = androidx.media3.common.C.TRACK_TYPE_VIDEO
+    const val TRACK_TYPE_TEXT = androidx.media3.common.C.TRACK_TYPE_TEXT
+    const val SELECTION_FLAG_DEFAULT = androidx.media3.common.C.SELECTION_FLAG_DEFAULT
 }
 
 val JoyColors = darkColorScheme(
