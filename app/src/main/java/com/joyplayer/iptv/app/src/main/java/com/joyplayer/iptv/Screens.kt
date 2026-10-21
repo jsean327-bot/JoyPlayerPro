@@ -283,7 +283,7 @@ fun LiveScreen(
     DisposableEffect(Unit) { onDispose { player.release() } }
     LaunchedEffect(selUrl, paused) {
         if (sel == null || paused) {
-            player.pause()
+            player.stop()
         } else {
             player.setMediaItem(MediaItem.fromUri(AppPrefs.fmtUrl(sel.url)))
             player.prepare()
