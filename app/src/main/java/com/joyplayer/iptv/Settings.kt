@@ -236,7 +236,7 @@ fun SettingsScreen(
     fun tap(id: String) {
         when (id) {
             "playlist" -> onPlaylists()
-            "lang", "pip", "update" -> toast("قريباً")
+            "lang", "update" -> toast("soon")
             else -> dialog = id
         }
     }
@@ -329,6 +329,7 @@ fun SettingsScreen(
             OutlinedTextField(key, { key = it }, singleLine = true, label = { Text("SubDL API key") })
             Button(onClick = { subs.key = key; toast("Saved") }) { Text("Save key") }
         }
+        "pip" -> PipDialog { dialog = "" }
         "parental" -> ParentalDialog(active, channels) { dialog = "" }
         "hlive" -> CategoryPickerLoader("live", false, active, channels) { dialog = "" }
         "hvod" -> CategoryPickerLoader("movies", false, active, channels) { dialog = "" }
