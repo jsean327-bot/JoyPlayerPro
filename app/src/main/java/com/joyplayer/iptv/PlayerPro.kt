@@ -308,4 +308,32 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                             }
                         }
                     }
-                    TextButton(onClick = { key = ""; settings.key = "" }) { Text("Change API
+                    TextButton(onClick = { key = ""; settings.key = "" }) { Text("Change API key") }
+                }
+            }
+            "quality" -> PlayerDialog("Video quality", { dialog = "" }) {
+                val vids = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
+                    .flatMap { g ->
+                        (0 until g.length).filter { g.isTrackSupported(it) }
+                            .map { Triple(g, it, g.getTrackFormat(it).height) }
+                    }
+                    .filter { it.third > 0 }
+                    .distinctBy { it.third }
+                    .sortedBy { it.third }
+                val isAuto = player.trackSelectionParameters.overrides.values
+                    .none { it.type == C.TRACK_TYPE_VIDEO }
+                Opt("Auto", isAuto) {
+                    player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+                        .clearOverridesOfType(C.TRACK_TYPE_VIDEO).build()
+                    dialog = ""
+                }
+                vids.forEach { (g, i, h) ->
+                    Opt(qLabel(h), g.isTrackSelected(i) && !isAuto) {
+                        selectTrack(player, g, i); dialog = ""
+                    }
+                }
+                if (vids.size <= 1) Text("This stream offers only one quality.", color = C.Text, fontSize = 13.sp)
+            }
+        }
+    }
+}
