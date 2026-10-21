@@ -319,10 +319,7 @@ fun LiveScreen(
                     Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
                     contentAlignment = Alignment.Center
                 ) {
-                    AndroidView(
-                        factory = { PlayerView(it).apply { useController = false; this.player = player } },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                                        PreviewSurface(player, sel, onFull)
                     if (sel == null) Text("Select a channel", color = C.Text)
                 }
                 Spacer(Modifier.height(8.dp))
