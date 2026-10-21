@@ -150,7 +150,7 @@ fun JoyApp() {
                 onExit = { (ctx as? Activity)?.finish() }
             )
         }
-        playing?.let { FullPlayer(it) { playing = null } }
+        playing?.let { ProPlayer(it) { playing = null } }
     }
 }
 
