@@ -79,7 +79,7 @@ fun AppRoot() {
         (ctx as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
     }
 
-    fun soon() = Toast.makeText(ctx, "قريباً", Toast.LENGTH_SHORT).show()
+    fun soon() = Toast.makeText(ctx, "soon", Toast.LENGTH_SHORT).show()
 
     fun openList(l0: SavedList, onOk: () -> Unit = {}) {
         scope.launch {
@@ -179,10 +179,10 @@ fun HomeScreen(
     onNav: (String) -> Unit, onSoon: () -> Unit, onChange: () -> Unit, onReload: () -> Unit, onExit: () -> Unit
 ) {
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0E1A4A), C.Bg)))) {
-        Text(
-            if (loading) "Loading..." else listName, color = C.Text,
-            modifier = Modifier.align(Alignment.TopEnd).padding(16.dp)
-        )
+        Column(Modifier.align(Alignment.TopEnd).padding(16.dp), horizontalAlignment = Alignment.End) {
+            Text(if (loading) "Loading..." else listName, color = C.Text)
+            ClockText()
+        }
         Column(
             Modifier.align(Alignment.Center).fillMaxWidth(0.88f),
             horizontalAlignment = Alignment.CenterHorizontally
