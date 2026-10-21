@@ -124,6 +124,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     val player = remember(ch.url) {
         ExoPlayer.Builder(ctx).build().apply { setMediaItem(baseItem); prepare(); playWhenReady = true }
     }
+    PipSupport(player)
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     var overlay by remember { mutableStateOf(true) }
     var dialog by remember { mutableStateOf("") }
@@ -215,7 +216,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             },
             modifier = Modifier.fillMaxSize()
         )
-        if (overlay || dialog.isNotEmpty()) {
+        if ((overlay || dialog.isNotEmpty()) && !PipState.inPip) {
             Row(
                 Modifier.align(Alignment.TopEnd).padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -223,6 +224,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 OverlayBtn("🔊 Audio") { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
+                OverlayBtn("🖼 PiP") { PipState.request(ctx) }
             }
         }
 
