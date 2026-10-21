@@ -78,7 +78,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
 
     val groups = remember(all) { all.groupBy { it.cat }.map { it.key to it.value.size } }
     val shown = remember(all, favs, recents, cat, query, order) {
-        val base = when (cat) {
+        val base = when (if (query.isBlank()) cat else "*all*") {
             "*all*" -> all
             "*fav*" -> all.filter { it.id.toString() in favs }
             "*rec*" -> recents.mapNotNull { r -> all.firstOrNull { it.id.toString() == r } }
