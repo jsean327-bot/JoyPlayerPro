@@ -68,8 +68,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             return@LaunchedEffect
         }
         loading = true; error = null
-        try {
+        try {            val hid = AppPrefs.hidden(kind, list.id)
+            val lock = if (Parental.unlocked) emptySet() else AppPrefs.locked(kind, list.id)
             all = withContext(Dispatchers.IO) { Vod.load(list, isSeries) }
+                .filter { it.cat !in hid && it.cat !in lock }
         } catch (e: Exception) {
             error = e.message ?: "Error"
         }
