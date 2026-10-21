@@ -2,6 +2,8 @@ name: Build APK
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -11,11 +13,29 @@ jobs:
         with:
           distribution: temurin
           java-version: 17
+      - name: Restore signing key
+        id: ks
+        uses: actions/cache@v4
+        with:
+          path: keystore/joyplayer.jks
+          key: joyplayer-keystore-v1
+      - name: Create signing key (first run only)
+        if: steps.ks.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p keystore
+          keytool -genkeypair -keystore keystore/joyplayer.jks -storepass joyplayer123 -keypass joyplayer123 -alias joyplayer -keyalg RSA -keysize 2048 -validity 36500 -dname "CN=JoyPlayer, O=JoyPlayer, C=DE"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
-      - run: gradle assembleDebug --no-daemon
+      - run: gradle assembleDebug --no-daemon -Pvcode=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
         with:
           name: JoyPlayer-IPTV-apk
           path: app/build/outputs/apk/debug/app-debug.apk
+      - name: Publish release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk JoyPlayer.apk
+          gh release create "v${{ github.run_number }}" JoyPlayer.apk --target "${{ github.sha }}" --title "JoyPlayer 1.0.${{ github.run_number }}" --notes "Automatic build ${{ github.run_number }}" --latest || gh release upload "v${{ github.run_number }}" JoyPlayer.apk --clobber
