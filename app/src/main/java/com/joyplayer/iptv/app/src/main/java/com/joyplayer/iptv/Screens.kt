@@ -112,6 +112,10 @@ fun AppRoot() {
                 },
                 onAdd = { error = null; adding = true }
             )
+            screen == "movies" || screen == "series" -> {
+                BackHandler(enabled = playing == null) { screen = "home" }
+                LibraryScreen(screen, active, { screen = it }, { playing = it })
+            }
             screen == "live" -> {
                 BackHandler(enabled = playing == null) { screen = "home" }
                 LiveScreen(
@@ -120,8 +124,7 @@ fun AppRoot() {
                         favs = if (c.url in favs) favs - c.url else favs + c.url
                         favStore.save(favs)
                     },
-                    onHome = { screen = "home" },
-                    onSoon = { soon() },
+                    onNav = { screen = it },
                     onFull = { playing = it }
                 )
             }
@@ -129,7 +132,7 @@ fun AppRoot() {
                 BackHandler(enabled = playing == null) { channels = emptyList() }
                 HomeScreen(
                     active?.name ?: "", loading, error,
-                    onLive = { screen = "live" },
+                    onNav = { screen = it },
                     onSoon = { soon() },
                     onChange = { channels = emptyList(); adding = false; error = null },
                     onReload = { active?.let { openList(it) } },
@@ -169,7 +172,7 @@ fun SideBtn(label: String, modifier: Modifier, onClick: () -> Unit) {
 @Composable
 fun HomeScreen(
     listName: String, loading: Boolean, error: String?,
-    onLive: () -> Unit, onSoon: () -> Unit, onChange: () -> Unit, onReload: () -> Unit, onExit: () -> Unit
+    onNav: (String) -> Unit, onSoon: () -> Unit, onChange: () -> Unit, onReload: () -> Unit, onExit: () -> Unit
 ) {
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0E1A4A), C.Bg)))) {
         Text(
@@ -184,11 +187,11 @@ fun HomeScreen(
             Text("IPTV PRO", fontSize = 12.sp, color = C.Burgundy, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth().height(200.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Tile("Live", "📺", Modifier.weight(1.6f).fillMaxHeight(), onLive)
+                Tile("Live", "📺", Modifier.weight(1.6f).fillMaxHeight()) { onNav("live") }
                 Column(Modifier.weight(2f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Tile("Movies", "🎬", Modifier.weight(1f).fillMaxHeight(), onSoon)
-                        Tile("Series", "🎞️", Modifier.weight(1f).fillMaxHeight(), onSoon)
+                        Tile("Movies", "🎬", Modifier.weight(1f).fillMaxHeight()) { onNav("movies") }
+                        Tile("Series", "🎞️", Modifier.weight(1f).fillMaxHeight()) { onNav("series") }
                     }
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Tile("Account", "👤", Modifier.weight(1f).fillMaxHeight(), onSoon)
@@ -237,7 +240,7 @@ fun CatRow(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
 @Composable
 fun LiveScreen(
     all: List<Channel>, favs: Set<String>, paused: Boolean,
-    onFav: (Channel) -> Unit, onHome: () -> Unit, onSoon: () -> Unit, onFull: (Channel) -> Unit
+    onFav: (Channel) -> Unit, onNav: (String) -> Unit, onFull: (Channel) -> Unit
 ) {
     val ctx = LocalContext.current
     var cat by rememberSaveable { mutableStateOf("*all*") }
@@ -273,10 +276,10 @@ fun LiveScreen(
             Modifier.fillMaxWidth().background(Color(0xFF0B1330)).padding(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            NavItem("Home", false, onHome)
+            NavItem("Home", false) { onNav("home") }
             NavItem("Live", true) {}
-            NavItem("Movies", false, onSoon)
-            NavItem("Series", false, onSoon)
+            NavItem("Movies", false) { onNav("movies") }
+            NavItem("Series", false) { onNav("series") }
             Spacer(Modifier.weight(1f))
             OutlinedTextField(
                 query, { query = it }, singleLine = true,
