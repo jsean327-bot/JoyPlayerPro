@@ -97,7 +97,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     val openItem: (LibItem) -> Unit = { item ->
         store.pushRecent(key, item.id.toString())
         recents = store.recents(key)
-        if (isSeries) open = item else onPlay(Channel(item.name, item.url, item.poster, item.cat))
+        open = item
     }
     val toggleFav: (LibItem) -> Unit = { item ->
         val k = item.id.toString()
@@ -107,7 +107,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
 
     val current = open
     if (current != null && list != null) {
-        SeriesDetail(list, current, { open = null }, onPlay)
+        DetailScreen(list, current, isSeries, current.id.toString() in favs, { toggleFav(current) }, { open = null }, onPlay)
         return
     }
 
