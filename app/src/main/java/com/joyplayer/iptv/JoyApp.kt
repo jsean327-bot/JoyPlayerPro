@@ -36,33 +36,35 @@ fun JoyApp() {
     val ctx = LocalContext.current
     val store = remember { ListStore(ctx) }
     val favStore = remember { FavStore(ctx) }
+    val prefs = remember { ctx.getSharedPreferences("joyplayer_app", android.content.Context.MODE_PRIVATE) }
     var lists by remember { mutableStateOf(store.load()) }
     var favs by remember { mutableStateOf(favStore.load()) }
-    var adding by remember { mutableStateOf(lists.isEmpty()) }
+    var adding by remember { mutableStateOf(false) }
     var active by remember { mutableStateOf<SavedList?>(null) }
     var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var screen by remember { mutableStateOf("home") }
     var playing by remember { mutableStateOf<Channel?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var job by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val scope = rememberCoroutineScope()
 
-    LaunchedEffect(Unit) {
-        (ctx as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-    }
-
-    fun soon() = Toast.makeText(ctx, "قريباً", Toast.LENGTH_SHORT).show()
+    fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
 
     fun openList(l0: SavedList, onOk: () -> Unit = {}) {
-        scope.launch {
+        job?.cancel()
+        job = scope.launch {
             loading = true; error = null
             try {
                 val l = SmartList.normalize(l0)
                 val res = withContext(Dispatchers.IO) {
                     if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
                 }
-                channels = res; active = l; screen = "home"
+                channels = res; active = l
+                prefs.edit().putString("last", l0.id).apply()
                 onOk()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 error = e.message ?: "Error"
             }
@@ -70,20 +72,41 @@ fun JoyApp() {
         }
     }
 
+    fun go(target: String) {
+        when {
+            target == "home" || target == "playlists" -> screen = target
+            channels.isNotEmpty() -> screen = target
+            lists.isEmpty() -> toast("أضف قائمة أولاً من Change Playlist")
+            loading -> toast("جاري الاتصال بالسيرفر...")
+            else -> toast("لا يوجد اتصال، جرّب Reload")
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        (ctx as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        val last = prefs.getString("last", null)
+        val l = lists.firstOrNull { it.id == last }
+        if (l != null) openList(l)
+    }
+
     Box(Modifier.fillMaxSize()) {
         when {
             adding -> {
-                BackHandler(enabled = lists.isNotEmpty()) { adding = false; error = null }
+                BackHandler { adding = false; error = null }
                 AddScreen(loading, error) { l ->
-                    openList(l) { lists = lists + l; store.save(lists); adding = false }
+                    openList(l) {
+                        lists = lists + l
+                        store.save(lists)
+                        adding = false
+                        screen = "home"
+                    }
                 }
             }
-            channels.isEmpty() || screen == "playlists" -> {
-                val back: (() -> Unit)? = if (channels.isNotEmpty()) ({ screen = "home" }) else null
-                BackHandler(enabled = back != null && playing == null) { screen = "home" }
+            screen == "playlists" -> {
+                BackHandler(enabled = playing == null) { screen = "home" }
                 PlaylistsScreen(
-                    lists, active?.id, loading, error, back,
-                    onConnect = { openList(it) },
+                    lists, active?.id, false, error, { screen = "home" },
+                    onConnect = { screen = "home"; openList(it) },
                     onSave = { u ->
                         lists = lists.map { if (it.id == u.id) u else it }
                         store.save(lists)
@@ -91,17 +114,16 @@ fun JoyApp() {
                     onDelete = { l ->
                         lists = lists.filter { it.id != l.id }
                         store.save(lists)
-                        if (active?.id == l.id) { active = null; channels = emptyList(); screen = "home" }
-                        if (lists.isEmpty()) adding = true
+                        if (active?.id == l.id) { active = null; channels = emptyList() }
                     },
                     onAdd = { error = null; adding = true }
                 )
             }
-            screen == "movies" || screen == "series" -> {
+            (screen == "movies" || screen == "series") && channels.isNotEmpty() -> {
                 BackHandler(enabled = playing == null) { screen = "home" }
-                LibraryScreen(screen, active, { screen = it }, { playing = it })
+                LibraryScreen(screen, active, { go(it) }, { playing = it })
             }
-            screen == "live" -> {
+            screen == "live" && channels.isNotEmpty() -> {
                 BackHandler(enabled = playing == null) { screen = "home" }
                 LiveScreen(
                     channels, favs, playing != null,
@@ -109,21 +131,24 @@ fun JoyApp() {
                         favs = if (c.url in favs) favs - c.url else favs + c.url
                         favStore.save(favs)
                     },
-                    onNav = { screen = it },
+                    onNav = { go(it) },
                     onFull = { playing = it }
                 )
             }
-            else -> {
-                BackHandler(enabled = playing == null) { screen = "playlists" }
-                HomeScreen(
-                    active?.name ?: "", loading, error,
-                    onNav = { screen = it },
-                    onSoon = { soon() },
-                    onChange = { error = null; screen = "playlists" },
-                    onReload = { active?.let { openList(it) } },
-                    onExit = { (ctx as? Activity)?.finish() }
-                )
-            }
+            else -> HomeScreen(
+                active?.name ?: if (lists.isEmpty()) "No playlist" else "",
+                loading, error,
+                onNav = { go(it) },
+                onSoon = { toast("قريباً") },
+                onChange = { error = null; screen = "playlists" },
+                onReload = {
+                    val l = active
+                        ?: lists.firstOrNull { it.id == prefs.getString("last", null) }
+                        ?: lists.firstOrNull()
+                    if (l != null) openList(l) else toast("أضف قائمة أولاً من Change Playlist")
+                },
+                onExit = { (ctx as? Activity)?.finish() }
+            )
         }
         playing?.let { PlayerScreen(it) { playing = null } }
     }
