@@ -121,7 +121,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         PlayMeta.map[ch.url] ?: SubMeta(PlayMeta.cleanTitle(ch.name), PlayMeta.year(ch.name), null, null)
     }
     val baseItem = remember(ch.url) { MediaItem.fromUri(AppPrefs.fmtUrl(ch.url)) }
-    val player = remember(ch.url) {
+    val shared = remember(ch.url) { SharedLive.takeFor(ch.url) }
+    val player = shared ?: remember(ch.url) {
         ExoPlayer.Builder(ctx).build().apply { setMediaItem(baseItem); prepare(); playWhenReady = true }
     }
     PipSupport(player)
@@ -144,9 +145,10 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             }
         }
         player.addListener(l)
-        onDispose { player.removeListener(l); player.release() }
-    }
-
+        onDispose {
+            player.removeListener(l)
+            if (shared == null) player.release() else SharedLive.restorePreview()
+        }
     suspend fun applyHit(h: SubHit) {
         val (file, ext) = withContext(Dispatchers.IO) { SubDl.fetch(h.url, meta, ctx.cacheDir) }
         val mime = when (ext) {
