@@ -250,14 +250,23 @@ fun LiveScreen(
     var cat by rememberSaveable { mutableStateOf("*all*") }
     var query by rememberSaveable { mutableStateOf("") }
     var selUrl by rememberSaveable { mutableStateOf<String?>(null) }
+    val histVersion = LiveHistory.version
     val groups = remember(all) { all.groupBy { it.group }.map { it.key to it.value.size } }
     val favCount = remember(all, favs) { all.count { it.url in favs } }
+    val recentCount = remember(all, histVersion) {
+        val urls = all.asSequence().map { it.url }.toHashSet()
+        LiveHistory.list().count { it in urls }
+    }
     val index by produceState(emptyList<String>(), all) {
         value = withContext(Dispatchers.Default) { all.map { normSearch(it.name + " " + it.group) } }
     }
-    val shown = remember(all, index, favs, cat, query) {
+    val shown = remember(all, index, favs, cat, query, histVersion) {
         val words = normSearch(query).split(' ').filter { it.isNotBlank() }
         when {
+            words.isEmpty() && cat == "*rec*" -> {
+                val byUrl = all.associateBy { it.url }
+                LiveHistory.list().mapNotNull { byUrl[it] }
+            }
             words.isEmpty() -> all.filter { c ->
                 when (cat) {
                     "*all*" -> true
@@ -301,6 +310,7 @@ fun LiveScreen(
             LazyColumn(Modifier.weight(0.27f).fillMaxHeight().background(C.Panel)) {
                 item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
                 item { CatRow("Favorite", favCount, cat == "*fav*") { cat = "*fav*" } }
+                item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
                 items(groups) { (g, n) -> CatRow(g, n, cat == g) { cat = g } }
             }
             LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
@@ -310,7 +320,9 @@ fun LiveScreen(
                         Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 1.dp)
                             .clip(RoundedCornerShape(6.dp))
                             .background(if (isSel) C.Blue else C.Row)
-                            .clickable { if (isSel) onFull(ch) else selUrl = ch.url }
+                            .clickable {
+                                if (isSel) onFull(ch) else { selUrl = ch.url; LiveHistory.push(ch.url) }
+                            }
                             .padding(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -338,7 +350,7 @@ fun LiveScreen(
                     Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
                     contentAlignment = Alignment.Center
                 ) {
-                                        PreviewSurface(player, sel, onFull)
+                    PreviewSurface(player, sel, onFull)
                     if (sel == null) Text("Select a channel", color = C.Text)
                 }
                 Spacer(Modifier.height(8.dp))
