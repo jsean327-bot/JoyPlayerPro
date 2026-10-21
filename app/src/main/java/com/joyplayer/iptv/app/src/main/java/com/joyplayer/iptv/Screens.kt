@@ -279,18 +279,7 @@ fun LiveScreen(
         }
     }
     val sel = remember(all, selUrl) { all.firstOrNull { it.url == selUrl } }
-    val player = remember { ExoPlayer.Builder(ctx).build() }
-    DisposableEffect(Unit) { onDispose { player.release() } }
-    LaunchedEffect(selUrl, paused) {
-        if (sel == null || paused) {
-            player.stop()
-        } else {
-            player.setMediaItem(MediaItem.fromUri(AppPrefs.fmtUrl(sel.url)))
-            player.prepare()
-            player.playWhenReady = true
-        }
-    }
-
+    val player = rememberLivePlayer(sel, paused)
     Column(Modifier.fillMaxSize().background(C.Bg)) {
         Row(
             Modifier.fillMaxWidth().background(Color(0xFF0B1330)).padding(horizontal = 8.dp),
@@ -350,7 +339,7 @@ fun LiveScreen(
                     Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
                     contentAlignment = Alignment.Center
                 ) {
-                    PreviewSurface(player, sel, onFull)
+                    LivePreviewSurface(player, sel, onFull)
                     if (sel == null) Text("Select a channel", color = C.Text)
                 }
                 Spacer(Modifier.height(8.dp))
