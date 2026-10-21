@@ -29,6 +29,7 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import kotlinx.coroutines.delay
+import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -42,6 +43,8 @@ object AppPrefs {
 
     private fun gi(k: String, d: Int): Int = p?.getInt(k, d) ?: d
     private fun pi(k: String, v: Int) { p?.edit()?.putInt(k, v)?.apply() }
+    private fun gs(k: String): Set<String> = p?.getStringSet(k, emptySet())?.toSet() ?: emptySet()
+    private fun ps(k: String, v: Set<String>) { p?.edit()?.putStringSet(k, v)?.apply() }
 
     var clock24: Boolean
         get() = gi("clock24", 1) == 1
@@ -71,6 +74,31 @@ object AppPrefs {
     val posterDp: Int
         get() = listOf(100, 128, 170)[posterSize.coerceIn(0, 2)]
 
+    val hasPin: Boolean
+        get() = (p?.getString("pin", "") ?: "").isNotEmpty()
+
+    private fun hashPin(pin: String): String =
+        MessageDigest.getInstance("SHA-256").digest("joyplayer:$pin".toByteArray())
+            .joinToString("") { "%02x".format(it) }
+
+    fun setPin(pin: String) { p?.edit()?.putString("pin", hashPin(pin))?.apply() }
+    fun clearPin() { p?.edit()?.remove("pin")?.apply() }
+    fun checkPin(pin: String): Boolean = hashPin(pin) == (p?.getString("pin", "") ?: "")
+
+    fun hidden(kind: String, listId: String?): Set<String> =
+        if (listId == null) emptySet() else gs("hid_${kind}_$listId")
+
+    fun setHidden(kind: String, listId: String, v: Set<String>) { ps("hid_${kind}_$listId", v) }
+
+    fun locked(kind: String, listId: String?): Set<String> =
+        if (listId == null || !hasPin) emptySet() else gs("lock_${kind}_$listId")
+
+    fun setLocked(kind: String, listId: String, v: Set<String>) { ps("lock_${kind}_$listId", v) }
+
+    var recentLive: List<String>
+        get() = (p?.getString("recent_live", "") ?: "").split("\n").filter { it.isNotBlank() }
+        set(v) { p?.edit()?.putString("recent_live", v.joinToString("\n"))?.apply() }
+
     fun fmtUrl(u: String): String {
         if (!u.contains("/live/")) return u
         if (liveFormat == 1 && u.endsWith(".m3u8")) return u.removeSuffix(".m3u8") + ".ts"
@@ -97,6 +125,23 @@ object AppPrefs {
     }
 }
 
+object Parental {
+    var unlocked by mutableStateOf(false)
+}
+
+object LiveHistory {
+    var version by mutableStateOf(0)
+    fun list(): List<String> = AppPrefs.recentLive
+    fun push(url: String) {
+        AppPrefs.recentLive = (listOf(url) + AppPrefs.recentLive.filter { it != url }).take(40)
+        version++
+    }
+    fun clear() {
+        AppPrefs.recentLive = emptyList()
+        version++
+    }
+}
+
 @Composable
 fun ClockText() {
     var now by remember { mutableStateOf(System.currentTimeMillis()) }
@@ -108,7 +153,7 @@ fun ClockText() {
 }
 
 @Composable
-private fun SOpt(label: String, selected: Boolean, onClick: () -> Unit) {
+fun SOpt(label: String, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
             .background(if (selected) C.Burgundy else C.Row)
@@ -120,7 +165,7 @@ private fun SOpt(label: String, selected: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-private fun SDialog(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun SDialog(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFF14102E)).padding(16.dp),
@@ -128,7 +173,7 @@ private fun SDialog(title: String, onDismiss: () -> Unit, content: @Composable C
         ) {
             Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Column(
-                Modifier.heightIn(max = 260.dp).verticalScroll(rememberScrollState()),
+                Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) { content() }
         }
@@ -158,7 +203,10 @@ private val setLangs = listOf(
 )
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onPlaylists: () -> Unit) {
+fun SettingsScreen(
+    active: SavedList?, channels: List<Channel>,
+    onBack: () -> Unit, onPlaylists: () -> Unit
+) {
     BackHandler(onBack = onBack)
     val ctx = LocalContext.current
     val subs = remember { SubSettings(ctx) }
@@ -188,8 +236,8 @@ fun SettingsScreen(onBack: () -> Unit, onPlaylists: () -> Unit) {
     fun tap(id: String) {
         when (id) {
             "playlist" -> onPlaylists()
-            "layout", "sort", "format", "auto", "clock", "sub", "hmovies", "hseriesh" -> dialog = id
-            else -> toast("قريباً")
+            "lang", "pip", "update" -> toast("قريباً")
+            else -> dialog = id
         }
     }
 
@@ -281,7 +329,20 @@ fun SettingsScreen(onBack: () -> Unit, onPlaylists: () -> Unit) {
             OutlinedTextField(key, { key = it }, singleLine = true, label = { Text("SubDL API key") })
             Button(onClick = { subs.key = key; toast("Saved") }) { Text("Save key") }
         }
-        "hmovies", "hseries" -> {
+        "parental" -> ParentalDialog(active, channels) { dialog = "" }
+        "hlive" -> CategoryPickerLoader("live", false, active, channels) { dialog = "" }
+        "hvod" -> CategoryPickerLoader("movies", false, active, channels) { dialog = "" }
+        "hseries" -> CategoryPickerLoader("series", false, active, channels) { dialog = "" }
+        "hchan" -> AlertDialog(
+            onDismissRequest = { dialog = "" },
+            title = { Text("Clear history?") },
+            text = { Text("This clears the recently watched channels list.") },
+            confirmButton = {
+                TextButton(onClick = { LiveHistory.clear(); dialog = ""; toast("Done") }) { Text("Clear") }
+            },
+            dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Cancel") } }
+        )
+        "hmovies", "hseriesh" -> {
             val kind = if (dialog == "hmovies") "movies" else "series"
             AlertDialog(
                 onDismissRequest = { dialog = "" },
