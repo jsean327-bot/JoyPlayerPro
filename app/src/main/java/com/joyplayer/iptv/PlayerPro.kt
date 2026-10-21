@@ -120,7 +120,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     val meta = remember(ch.url) {
         PlayMeta.map[ch.url] ?: SubMeta(PlayMeta.cleanTitle(ch.name), PlayMeta.year(ch.name), null, null)
     }
-    val baseItem = remember(ch.url) { MediaItem.fromUri(ch.url) }
+    val baseItem = remember(ch.url) { MediaItem.fromUri(AppPrefs.fmtUrl(ch.url)) }
     val player = remember(ch.url) {
         ExoPlayer.Builder(ctx).build().apply { setMediaItem(baseItem); prepare(); playWhenReady = true }
     }
@@ -197,7 +197,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         AndroidView(
             factory = { c ->
                 PlayerView(c).apply {
-                    this.player = player
+                    AppPrefs.styleSubtitles(this)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                     )
