@@ -34,6 +34,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun JoyApp() {
     val ctx = LocalContext.current
+    AppPrefs.init(ctx)
     val store = remember { ListStore(ctx) }
     val favStore = remember { FavStore(ctx) }
     val prefs = remember { ctx.getSharedPreferences("joyplayer_app", android.content.Context.MODE_PRIVATE) }
@@ -48,6 +49,15 @@ fun JoyApp() {
     var error by remember { mutableStateOf<String?>(null) }
     var job by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     val scope = rememberCoroutineScope()
+
+    val sortMode = AppPrefs.liveSort
+    val liveChannels = remember(channels, sortMode) {
+        when (sortMode) {
+            1 -> channels.sortedBy { it.name.lowercase() }
+            2 -> channels.sortedByDescending { it.name.lowercase() }
+            else -> channels
+        }
+    }
 
     fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
 
@@ -74,7 +84,7 @@ fun JoyApp() {
 
     fun go(target: String) {
         when {
-            target == "home" || target == "playlists" -> screen = target
+            target == "home" || target == "playlists" || target == "settings" -> screen = target
             channels.isNotEmpty() -> screen = target
             lists.isEmpty() -> toast("أضف قائمة أولاً من Change Playlist")
             loading -> toast("جاري الاتصال بالسيرفر...")
@@ -84,9 +94,11 @@ fun JoyApp() {
 
     LaunchedEffect(Unit) {
         (ctx as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-        val last = prefs.getString("last", null)
-        val l = lists.firstOrNull { it.id == last }
-        if (l != null) openList(l)
+        if (AppPrefs.autoConnect) {
+            val last = prefs.getString("last", null)
+            val l = lists.firstOrNull { it.id == last }
+            if (l != null) openList(l)
+        }
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -119,6 +131,10 @@ fun JoyApp() {
                     onAdd = { error = null; adding = true }
                 )
             }
+            screen == "settings" -> SettingsScreen(
+                onBack = { screen = "home" },
+                onPlaylists = { screen = "playlists" }
+            )
             (screen == "movies" || screen == "series") && channels.isNotEmpty() -> {
                 BackHandler(enabled = playing == null) { screen = "home" }
                 LibraryScreen(screen, active, { go(it) }, { playing = it })
@@ -126,7 +142,7 @@ fun JoyApp() {
             screen == "live" && channels.isNotEmpty() -> {
                 BackHandler(enabled = playing == null) { screen = "home" }
                 LiveScreen(
-                    channels, favs, playing != null,
+                    liveChannels, favs, playing != null,
                     onFav = { c ->
                         favs = if (c.url in favs) favs - c.url else favs + c.url
                         favStore.save(favs)
