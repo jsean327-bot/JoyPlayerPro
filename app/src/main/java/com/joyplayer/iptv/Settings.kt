@@ -236,7 +236,7 @@ fun SettingsScreen(
     fun tap(id: String) {
         when (id) {
             "playlist" -> onPlaylists()
-            "lang", "update" -> toast("soon")
+            "lang" -> toast("App language: English")
             else -> dialog = id
         }
     }
@@ -330,6 +330,7 @@ fun SettingsScreen(
             Button(onClick = { subs.key = key; toast("Saved") }) { Text("Save key") }
         }
         "pip" -> PipDialog { dialog = "" }
+        "update" -> UpdateDialog { dialog = "" }
         "parental" -> ParentalDialog(active, channels) { dialog = "" }
         "hlive" -> CategoryPickerLoader("live", false, active, channels) { dialog = "" }
         "hvod" -> CategoryPickerLoader("movies", false, active, channels) { dialog = "" }
