@@ -104,8 +104,9 @@ object AppPrefs {
 
     fun fmtUrl(u: String): String {
         if (!u.contains("/live/")) return u
+        // liveFormat: 0 = Default (as provided), 1 = MPEG-TS, 2 = HLS
         if (liveFormat == 1 && u.endsWith(".m3u8")) return u.removeSuffix(".m3u8") + ".ts"
-        if (liveFormat == 0 && u.endsWith(".ts")) return u.removeSuffix(".ts") + ".m3u8"
+        if (liveFormat == 2 && u.endsWith(".ts")) return u.removeSuffix(".ts") + ".m3u8"
         return u
     }
 
@@ -316,10 +317,24 @@ fun SettingsScreen(
             "Live channel sort", listOf("Default (as provided)", "A → Z", "Z → A"), AppPrefs.liveSort,
             { AppPrefs.liveSort = it; dialog = "" }, { dialog = "" }
         )
-        "format" -> ChoiceDialog(
-            "Live stream format", listOf("HLS (.m3u8)", "MPEG-TS (.ts)"), AppPrefs.liveFormat,
-            { AppPrefs.liveFormat = it; dialog = "" }, { dialog = "" }
-        )
+        "format" -> SDialog("Live Stream Format", { dialog = "" }) {
+            var fmt by remember { mutableStateOf(AppPrefs.liveFormat.coerceIn(0, 2)) }
+            LayoutOpt("Default", fmt == 0) { fmt = 0 }
+            LayoutOpt("MPEGTS(.ts)", fmt == 1) { fmt = 1 }
+            LayoutOpt("HLS(.m3u8)", fmt == 2) { fmt = 2 }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { AppPrefs.liveFormat = fmt; dialog = "" },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+                    modifier = Modifier.weight(1f)
+                ) { Text("OK") }
+                Button(
+                    onClick = { dialog = "" },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Cancel") }
+            }
+        }
         "clock" -> ChoiceDialog(
             "Time format", listOf("24-hour", "12-hour (AM/PM)"), if (AppPrefs.clock24) 0 else 1,
             { AppPrefs.clock24 = it == 0; dialog = "" }, { dialog = "" }
