@@ -310,11 +310,18 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             modifier = Modifier.fillMaxSize()
         )
         if (!hasMeta && overlay && dialog.isEmpty() && !PipState.inPip) {
-            EpgBadge(ch, Modifier.align(Alignment.TopStart).padding(12.dp).fillMaxWidth(0.42f))
+            val narrow = rememberIsCompact()
+            EpgBadge(
+                ch,
+                Modifier.align(Alignment.TopStart)
+                    .padding(start = 12.dp, end = 12.dp, top = if (narrow) 64.dp else 12.dp)
+                    .fillMaxWidth(if (narrow) 1f else 0.42f)
+            )
         }
         if ((overlay || dialog.isNotEmpty()) && !PipState.inPip) {
             Row(
                 Modifier.align(Alignment.TopEnd).padding(12.dp)
+                    .horizontalScroll(rememberScrollState())
                     .onPreviewKeyEvent { e ->
                         if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
                             runCatching { boxFr.requestFocus() }; true
