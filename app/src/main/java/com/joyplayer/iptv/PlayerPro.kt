@@ -160,6 +160,18 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     PipSupport(player)
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     var overlay by remember { mutableStateOf(true) }
+    // touch-seek HUD (double-tap skip / hold-and-slide scrub)
+    var seekHud by remember { mutableStateOf<String?>(null) }
+    var skipAcc by remember { mutableStateOf(0L) }
+    var scrubUi by remember { mutableStateOf(false) }
+    var hudTick by remember { mutableStateOf(0) }
+    LaunchedEffect(hudTick) {
+        if (!scrubUi) {
+            delay(900)
+            seekHud = null
+            skipAcc = 0L
+        }
+    }
     var dialog by remember { mutableStateOf("") }
     var key by remember { mutableStateOf(settings.key) }
     var auto by remember { mutableStateOf(settings.auto) }
@@ -355,6 +367,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     ) {
         AndroidView(
             factory = { c ->
+                val exo = player
                 (android.view.LayoutInflater.from(c).inflate(R.layout.player_view, null) as PlayerView).apply {
                     this.player = player
                     pv = this
@@ -365,18 +378,98 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     setControllerVisibilityListener(
                         PlayerView.ControllerVisibilityListener { v -> overlay = v == View.VISIBLE }
                     )
+                    val view = this
+                    val skipMs = 10_000L
+                    var scrubbing = false
+                    var startX = 0f
+                    var startPos = 0L
+                    var target = 0L
+
+                    fun canSeek(): Boolean = hasMeta && exo.isCurrentMediaItemSeekable
+
+                    fun skipBy(ms: Long) {
+                        val d = exo.duration
+                        var t = exo.currentPosition + ms
+                        if (t < 0L) t = 0L
+                        if (d > 0L && t > d - 1000L) t = (d - 1000L).coerceAtLeast(0L)
+                        exo.seekTo(t)
+                        skipAcc = if (seekHud != null && skipAcc != 0L && (skipAcc > 0L) == (ms > 0L)) skipAcc + ms else ms
+                        seekHud = if (skipAcc > 0L) "+${skipAcc / 1000}s  ⏩" else "⏪  -${-skipAcc / 1000}s"
+                        hudTick++
+                    }
+
                     val gd = GestureDetector(c, object : GestureDetector.SimpleOnGestureListener() {
+                        override fun onDown(e: MotionEvent): Boolean = true
+
                         override fun onDoubleTap(e: MotionEvent): Boolean {
-                            back()
+                            if (!canSeek()) { back(); return true }
+                            val w = view.width.toFloat().coerceAtLeast(1f)
+                            when {
+                                e.x < w * 0.4f -> skipBy(-skipMs)
+                                e.x > w * 0.6f -> skipBy(skipMs)
+                                else -> if (exo.isPlaying) exo.pause() else exo.play()
+                            }
                             return true
                         }
+
+                        override fun onLongPress(e: MotionEvent) {
+                            if (!canSeek()) return
+                            scrubbing = true
+                            startX = e.x
+                            startPos = exo.currentPosition
+                            target = startPos
+                            scrubUi = true
+                            seekHud = ResumeStore.fmt(startPos)
+                            hudTick++
+                            view.parent?.requestDisallowInterceptTouchEvent(true)
+                        }
                     })
-                    setOnTouchListener { _, e -> gd.onTouchEvent(e); false }
+                    setOnTouchListener { _, e ->
+                        gd.onTouchEvent(e)
+                        if (scrubbing) {
+                            when (e.actionMasked) {
+                                MotionEvent.ACTION_MOVE -> {
+                                    val w = view.width.toFloat().coerceAtLeast(1f)
+                                    val d = exo.duration
+                                    var t = startPos + ((e.x - startX) / w * 120_000f).toLong()
+                                    if (t < 0L) t = 0L
+                                    if (d > 0L && t > d - 1000L) t = (d - 1000L).coerceAtLeast(0L)
+                                    target = t
+                                    val diff = t - startPos
+                                    val sign = if (diff >= 0L) "+" else "-"
+                                    seekHud = ResumeStore.fmt(t) + "   (" + sign + ResumeStore.fmt(kotlin.math.abs(diff)) + ")"
+                                    hudTick++
+                                }
+                                MotionEvent.ACTION_UP -> {
+                                    exo.seekTo(target)
+                                    scrubbing = false
+                                    scrubUi = false
+                                    hudTick++
+                                }
+                                MotionEvent.ACTION_CANCEL -> {
+                                    scrubbing = false
+                                    scrubUi = false
+                                    hudTick++
+                                }
+                            }
+                            true
+                        } else false
+                    }
                 }
             },
             update = { v -> v.resizeMode = resizeMode },
             modifier = Modifier.fillMaxSize()
         )
+        seekHud?.let { t ->
+            if (!PipState.inPip) {
+                Text(
+                    t, color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.align(Alignment.Center)
+                        .clip(RoundedCornerShape(14.dp)).background(Color(0xAA000000))
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                )
+            }
+        }
         val diag = PlayerFactory.lastDiag
         if (diag.isNotEmpty() && !PipState.inPip) {
             Text(
