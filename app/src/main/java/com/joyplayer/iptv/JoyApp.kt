@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
@@ -97,7 +99,9 @@ fun JoyApp() {
     }
 
     LaunchedEffect(Unit) {
-        (ctx as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        (ctx as? Activity)?.requestedOrientation =
+            if (isTvDevice(ctx)) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            else ActivityInfo.SCREEN_ORIENTATION_FULL_SENSOR
         if (AppPrefs.autoConnect) {
             val last = prefs.getString("last", null)
             val l = lists.firstOrNull { it.id == last }
@@ -290,7 +294,7 @@ fun PlaylistsScreen(
             onDismissRequest = { edit = null },
             title = { Text("Edit playlist") },
             text = {
-                Column {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
                     OutlinedTextField(name, { name = it }, label = { Text("Name") }, singleLine = true)
                     if (l.type == "m3u") {
                         OutlinedTextField(url, { url = it }, label = { Text("M3U URL") }, singleLine = true)
