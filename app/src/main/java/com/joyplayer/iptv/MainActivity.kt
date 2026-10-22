@@ -37,7 +37,10 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme(colorScheme = JoyColors) {
                 androidx.compose.runtime.CompositionLocalProvider(
-                    androidx.compose.foundation.LocalIndication provides TvIndication
+                    androidx.compose.foundation.LocalIndication provides TvIndication,
+                    androidx.compose.ui.platform.LocalLayoutDirection provides
+                        (if (Lang.code == "ar") androidx.compose.ui.unit.LayoutDirection.Rtl
+                         else androidx.compose.ui.unit.LayoutDirection.Ltr)
                 ) {
                     Surface(Modifier.fillMaxSize()) { JoyApp() }
                 }
