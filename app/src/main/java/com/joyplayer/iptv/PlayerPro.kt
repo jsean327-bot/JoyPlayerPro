@@ -1,6 +1,12 @@
 package com.joyplayer.iptv
 
+import android.app.Activity
 import android.net.Uri
+import android.os.Build
+import android.view.WindowManager
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.View
@@ -161,6 +167,37 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     var hits by remember { mutableStateOf<List<SubHit>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
+    // Picture size: 0 = Fit (black bars), 4 = Zoom (fills the screen, crops edges), 3 = Stretch
+    val playerPrefs = remember { ctx.getSharedPreferences("joyplayer_player", android.content.Context.MODE_PRIVATE) }
+    var resizeMode by remember { mutableStateOf(playerPrefs.getInt("resize", 0)) }
+
+    // Fullscreen: hide the system bars, use the notch area, and keep the screen awake while playing
+    DisposableEffect(Unit) {
+        val win = (ctx as? Activity)?.window
+        if (win != null) {
+            win.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            val c = WindowCompat.getInsetsController(win, win.decorView)
+            c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            c.hide(WindowInsetsCompat.Type.systemBars())
+            if (Build.VERSION.SDK_INT >= 28) {
+                val lp = win.attributes
+                lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                win.attributes = lp
+            }
+        }
+        onDispose {
+            if (win != null) {
+                win.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                WindowCompat.getInsetsController(win, win.decorView).show(WindowInsetsCompat.Type.systemBars())
+                if (Build.VERSION.SDK_INT >= 28) {
+                    val lp = win.attributes
+                    lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                    win.attributes = lp
+                }
+            }
+        }
+    }
+
     val boxFr = remember { FocusRequester() }
     val firstBtnFr = remember { FocusRequester() }
     var boxFocused by remember { mutableStateOf(false) }
@@ -309,6 +346,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     setOnTouchListener { _, e -> gd.onTouchEvent(e); false }
                 }
             },
+            update = { v -> v.resizeMode = resizeMode },
             modifier = Modifier.fillMaxSize()
         )
         val diag = PlayerFactory.lastDiag
@@ -343,6 +381,12 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 OverlayBtn("🔊 Audio", Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
+                OverlayBtn(
+                    when (resizeMode) { 4 -> "⤢ Zoom"; 3 -> "⤢ Stretch"; else -> "⤢ Fit" }
+                ) {
+                    resizeMode = when (resizeMode) { 0 -> 4; 4 -> 3; else -> 0 }
+                    playerPrefs.edit().putInt("resize", resizeMode).apply()
+                }
                 OverlayBtn("🖼 PiP") { PipState.request(ctx) }
                 PlayQueue.nextAfter(ch.url)?.let { nx ->
                     if (hasMeta) OverlayBtn("⏭ Next") {
