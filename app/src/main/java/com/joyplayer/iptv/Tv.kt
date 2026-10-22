@@ -53,3 +53,17 @@ private class TvIndicationInstance(
 }
 
 private fun Int.dpPx(s: ContentDrawScope): Float = this * s.density
+
+/** True on phones in portrait (narrow screens): screens switch to a stacked, scrollable layout. */
+@Composable
+fun rememberIsCompact(): Boolean =
+    androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 600
+
+/** True on Fire TV / Android TV boxes. */
+fun isTvDevice(ctx: android.content.Context): Boolean {
+    val ui = ctx.getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+    val pm = ctx.packageManager
+    return ui?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION ||
+            pm.hasSystemFeature("android.hardware.type.television") ||
+            pm.hasSystemFeature("amazon.hardware.fire_tv")
+}
