@@ -150,12 +150,11 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(error ?: "", color = Color(0xFFFF8A8A))
             }
-            AppPrefs.listLayout -> LazyColumn(
-                contentPadding = PaddingValues(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            AppPrefs.listLayout -> LazyColumn(Modifier.padding(horizontal = 12.dp)) {
                 items(shown) { item ->
-                    PosterRow(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) })
+                    Box(Modifier.padding(vertical = 4.dp)) {
+                        PosterRow(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) })
+                    }
                 }
             }
             else -> LazyVerticalGrid(
