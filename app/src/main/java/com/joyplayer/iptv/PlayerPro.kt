@@ -131,7 +131,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     }
     val baseItem = remember(ch.url) { MediaItem.fromUri(AppPrefs.fmtUrl(ch.url)) }
     val shared = remember(ch.url) { SharedLive.takeFor(ch.url) }
-    val triedAlt = remember(ch.url) { mutableSetOf<String>() }
+    val retries = remember(ch.url) { HashMap<String, StreamRetry>() }
     ResumeStore.init(ctx)
     val resumeAt = remember(ch.url) { if (hasMeta && shared == null) ResumeStore.get(ch.url) else 0L }
     val player = shared ?: remember(ch.url) {
@@ -178,6 +178,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         val l = object : Player.Listener {
             override fun onTracksChanged(t: Tracks) { tracks = t }
             override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) { retries.clear(); PlayerFactory.lastDiag = "" }
                 if (state == Player.STATE_ENDED && hasMeta && shared == null) {
                     val nx = PlayQueue.nextAfter(ch.url)
                     val go = PlayQueue.play
@@ -191,18 +192,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 if (shared != null) return   // the live preview player reports its own errors
-                val cur = player.currentMediaItem?.localConfiguration?.uri?.toString()
-                val alt = cur?.let { PlayerFactory.altUrl(it) }
-                if (cur != null && alt != null && cur !in triedAlt) {
-                    triedAlt.add(cur); triedAlt.add(alt)
-                    player.setMediaItem(MediaItem.fromUri(alt))
-                    player.prepare()
-                    player.playWhenReady = true
-                } else {
-                    android.widget.Toast.makeText(
-                        ctx, "Playback error: ${PlayerFactory.describe(error)}", android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
+                val cur = player.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
+                PlayerFactory.handleError(ctx, player, error, cur, retries)
             }
         }
         player.addListener(l)
@@ -320,6 +311,15 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             },
             modifier = Modifier.fillMaxSize()
         )
+        val diag = PlayerFactory.lastDiag
+        if (diag.isNotEmpty() && !PipState.inPip) {
+            Text(
+                diag, color = Color.White, fontSize = 11.sp,
+                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(start = 12.dp, end = 12.dp, bottom = 90.dp)
+                    .clip(RoundedCornerShape(8.dp)).background(Color(0xCC000000)).padding(8.dp)
+            )
+        }
         if (!hasMeta && overlay && dialog.isEmpty() && !PipState.inPip) {
             val narrow = rememberIsCompact()
             EpgBadge(
