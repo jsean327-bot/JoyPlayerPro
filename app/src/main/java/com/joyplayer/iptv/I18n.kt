@@ -265,6 +265,10 @@ Allow installs from JoyPlayer, come back here and press Install.|اسمح بال
 """
 
 private val T_SETTINGS = """
+List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
+Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
+OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
+Poster size|حجم الملصق|Taille des affiches|Tamaño de carteles|Postergröße|Dimensione locandine|Tamanho dos pôsteres|Размер постеров|Poster boyutu
 Parental Control|الرقابة الأبوية|Contrôle parental|Control parental|Kindersicherung|Controllo parentale|Controle parental|Родительский контроль|Ebeveyn denetimi
 Change Language|تغيير اللغة|Changer de langue|Cambiar idioma|Sprache ändern|Cambia lingua|Alterar idioma|Сменить язык|Dili değiştir
 Change Layout|تغيير التخطيط|Changer la disposition|Cambiar diseño|Layout ändern|Cambia layout|Alterar layout|Сменить макет|Düzeni değiştir
