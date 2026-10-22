@@ -44,6 +44,8 @@ import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackParameters
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -187,6 +189,56 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     var subOffset by remember(ch.url) { mutableStateOf(0L) }
     var delayPending by remember(ch.url) { mutableStateOf(0L) }
     var speed by remember(ch.url) { mutableStateOf(1f) }
+    // Google Cast (phones with Google Play services only)
+    val castCtx = remember { if (isTvDevice(ctx)) null else CastHelper.context(ctx) }
+    var castName by remember { mutableStateOf<String?>(null) }
+    var castPos by remember { mutableStateOf(0L) }
+    DisposableEffect(castCtx) {
+        val sm = castCtx?.sessionManager
+        if (sm == null) {
+            onDispose { }
+        } else {
+            val l = object : SessionManagerListener<CastSession> {
+                override fun onSessionStarted(s: CastSession, id: String) {
+                    castName = s.castDevice?.friendlyName ?: "TV"
+                    val c = s.remoteMediaClient
+                    if (c != null) {
+                        c.load(
+                            CastHelper.request(
+                                AppPrefs.fmtUrl(ch.url), ch.name, ch.logo, !hasMeta,
+                                if (hasMeta) player.currentPosition else 0L
+                            )
+                        )
+                    }
+                    player.pause()
+                }
+                override fun onSessionResumed(s: CastSession, wasSuspended: Boolean) {
+                    castName = s.castDevice?.friendlyName ?: "TV"
+                }
+                override fun onSessionEnding(s: CastSession) {
+                    castPos = s.remoteMediaClient?.approximateStreamPosition ?: 0L
+                }
+                override fun onSessionEnded(s: CastSession, error: Int) {
+                    val was = castName != null
+                    castName = null
+                    if (was) {
+                        if (hasMeta && castPos > 0L) player.seekTo(castPos)
+                        player.play()
+                    }
+                }
+                override fun onSessionStarting(s: CastSession) {}
+                override fun onSessionStartFailed(s: CastSession, error: Int) { castName = null }
+                override fun onSessionResuming(s: CastSession, id: String) {}
+                override fun onSessionResumeFailed(s: CastSession, error: Int) {}
+                override fun onSessionSuspended(s: CastSession, reason: Int) {}
+            }
+            sm.addSessionManagerListener(l, CastSession::class.java)
+            onDispose {
+                sm.removeSessionManagerListener(l, CastSession::class.java)
+                if (castName != null) sm.endCurrentSession(true)
+            }
+        }
+    }
     var sleepEnd by remember { mutableStateOf(0L) }
     var sleepLeft by remember { mutableStateOf(0) }
     LaunchedEffect(sleepEnd) {
@@ -566,6 +618,15 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 )
             }
         }
+        castName?.let { n ->
+            if (!PipState.inPip) {
+                CastBar(
+                    n, castCtx?.sessionManager?.currentCastSession?.remoteMediaClient, hasMeta,
+                    { castCtx?.sessionManager?.endCurrentSession(true) },
+                    Modifier.align(Alignment.Center)
+                )
+            }
+        }
         val diag = PlayerFactory.lastDiag
         if (diag.isNotEmpty() && !PipState.inPip) {
             Text(
@@ -604,6 +665,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
                 if (hasMeta) OverlayBtn("⏩ " + (if (speed == 1f) "1x" else "${speed}x")) { dialog = "speed" }
                 OverlayBtn(if (sleepEnd > 0L) "😴 ${sleepLeft}m" else "😴 Sleep") { dialog = "sleep" }
+                if (castCtx != null) OverlayBtn("📡 Cast") { dialog = "cast" }
                 OverlayBtn(
                     when (resizeMode) { 4 -> "⤢ Zoom"; 3 -> "⤢ Stretch"; else -> "⤢ Fit" }
                 ) {
@@ -681,6 +743,9 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                         ) { Text("OK") }
                     }
                 }
+            }
+            "cast" -> castCtx?.let { cc ->
+                CastDialog(cc, castName, { cc.sessionManager.endCurrentSession(true) }, { dialog = "" })
             }
             "speed" -> PlayerDialog("Playback speed", { dialog = "" }) {
                 listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f).forEach { sp ->
