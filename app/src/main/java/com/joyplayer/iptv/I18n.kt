@@ -265,6 +265,7 @@ Allow installs from JoyPlayer, come back here and press Install.|اسمح بال
 """
 
 private val T_SETTINGS = """
+Default|افتراضي|Par défaut|Predeterminado|Standard|Predefinito|Padrão|По умолчанию|Varsayılan
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
