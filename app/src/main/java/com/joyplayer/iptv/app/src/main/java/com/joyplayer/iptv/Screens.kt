@@ -330,6 +330,7 @@ fun LiveScreen(
     }
     SideEffect {
         LiveZap.list = shown
+        LiveZap.all = all
         LiveZap.play = onFull
         LiveZap.onSelect = { c -> selUrl = c.url; LiveHistory.push(c.url) }
     }
