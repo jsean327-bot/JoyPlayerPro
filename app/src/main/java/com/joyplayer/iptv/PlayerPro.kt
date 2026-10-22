@@ -135,7 +135,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     val resumeAt = remember(ch.url) { if (hasMeta && shared == null) ResumeStore.get(ch.url) else 0L }
     val player = shared ?: remember(ch.url) {
         ExoPlayer.Builder(ctx).build().apply {
-            setMediaItem(baseItem, resumeAt.coerceAtLeast(0L)); prepare(); playWhenReady = true
+            if (resumeAt > 0L) setMediaItem(baseItem, resumeAt) else setMediaItem(baseItem)
+            prepare(); playWhenReady = true
         }
     }
     LaunchedEffect(ch.url) {
