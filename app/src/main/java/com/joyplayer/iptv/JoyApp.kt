@@ -198,7 +198,12 @@ fun JoyApp() {
                 onPlay = { playing = it }
             )
         }
-        playing?.let { ProPlayer(it) { playing = null } }
+        playing?.let {
+            // player controls keep the usual left-to-right layout (seek bar, time, buttons)
+            androidx.compose.runtime.CompositionLocalProvider(
+                androidx.compose.ui.platform.LocalLayoutDirection provides androidx.compose.ui.unit.LayoutDirection.Ltr
+            ) { ProPlayer(it) { playing = null } }
+        }
     }
 }
 
