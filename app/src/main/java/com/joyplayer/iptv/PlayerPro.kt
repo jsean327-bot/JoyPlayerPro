@@ -163,6 +163,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     PipSupport(player)
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     var overlay by remember { mutableStateOf(true) }
+    var uiTick by remember { mutableStateOf(0) }   // bumped on every key press: restarts the auto-hide timer
     // touch-seek HUD (double-tap skip / hold-and-slide scrub)
     var seekHud by remember { mutableStateOf<String?>(null) }
     var skipAcc by remember { mutableStateOf(0L) }
@@ -350,6 +351,23 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         }
     }
 
+    // Hide the controls + top buttons by themselves while watching (5 s without any key / touch)
+    LaunchedEffect(overlay, dialog, uiTick) {
+        if (overlay && dialog.isEmpty()) {
+            delay(5000)
+            pv?.hideController()
+        }
+    }
+
+    // Remote: show the top buttons (Audio, Subtitles, Quality ...) and move the focus onto them
+    fun focusButtons() {
+        pv?.showController()
+        scope.launch {
+            delay(160)
+            runCatching { firstBtnFr.requestFocus() }
+        }
+    }
+
     // Remote control: keep focus on the video so OK / left / right work, return to it after dialogs.
     LaunchedEffect(dialog, overlay) {
         if (dialog.isEmpty() && (overlay || !boxFocused)) {
@@ -467,6 +485,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             .focusRequester(boxFr)
             .onFocusChanged { boxFocused = it.isFocused }
             .onPreviewKeyEvent { e ->
+                if (e.type == KeyEventType.KeyDown) uiTick++
                 if (!boxFocused || dialog.isNotEmpty() || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val repeat = e.nativeKeyEvent.repeatCount
                 val step = if (repeat > 6) 30_000L else 10_000L
@@ -474,6 +493,9 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.MediaPlayPause -> {
                         if (numBuf.isNotEmpty() && e.key != Key.MediaPlayPause) {
                             jumpNumber()
+                        } else if (!hasMeta && e.key != Key.MediaPlayPause) {
+                            // live TV: OK opens the buttons row (Audio / Subtitles / Quality ...)
+                            focusButtons()
                         } else {
                             if (player.isPlaying) player.pause() else player.play()
                             pv?.showController()
@@ -508,14 +530,10 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Key.ChannelUp -> { if (canZap) zap(1) else pv?.showController(); true }
                     Key.ChannelDown -> { if (canZap) zap(-1) else pv?.showController(); true }
                     Key.DirectionUp -> {
-                        if (canZap) zap(-1)
-                        else if (overlay) runCatching { firstBtnFr.requestFocus() } else pv?.showController()
+                        if (canZap) zap(-1) else focusButtons()
                         true
                     }
-                    Key.Menu -> {
-                        if (overlay) runCatching { firstBtnFr.requestFocus() } else pv?.showController()
-                        true
-                    }
+                    Key.Menu -> { focusButtons(); true }
                     Key.DirectionDown -> { if (canZap) zap(1) else pv?.showController(); true }
                     else -> false
                 }
@@ -715,6 +733,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 Modifier.align(Alignment.TopEnd).padding(12.dp)
                     .horizontalScroll(rememberScrollState())
                     .onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown) uiTick++
                         if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
                             runCatching { boxFr.requestFocus() }; true
                         } else false
