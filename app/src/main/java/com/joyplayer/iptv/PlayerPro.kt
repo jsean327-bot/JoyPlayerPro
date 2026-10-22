@@ -294,11 +294,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
 
     // Live channel zapping (inside the list the user was browsing)
     val canZap = !hasMeta && LiveZap.list.size > 1
-    fun zap(d: Int) {
-        val list = LiveZap.list
-        val i = list.indexOfFirst { it.url == ch.url }
-        if (i < 0 || list.size < 2) return
-        val n = list[((i + d) % list.size + list.size) % list.size]
+    fun goTo(n: Channel, num: Int) {
         // keep using the one live connection: switch the shared player to the new channel
         SharedLive.player?.let { sp ->
             if (shared != null) {
@@ -308,9 +304,50 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             }
         }
         LiveZap.onSelect?.invoke(n)
-        android.widget.Toast.makeText(ctx, "${((i + d) % list.size + list.size) % list.size + 1}. ${n.name}", android.widget.Toast.LENGTH_SHORT).show()
+        android.widget.Toast.makeText(ctx, "$num. ${n.name}", android.widget.Toast.LENGTH_SHORT).show()
         pv?.showController()
         LiveZap.play?.invoke(n)
+    }
+
+    fun zap(d: Int) {
+        val list = LiveZap.list
+        val i = list.indexOfFirst { it.url == ch.url }
+        if (i < 0 || list.size < 2) return
+        val idx = ((i + d) % list.size + list.size) % list.size
+        goTo(list[idx], idx + 1)
+    }
+
+    // Number keys on the remote: type a channel number (its position in the list), 0 = previous channel
+    var numBuf by remember { mutableStateOf("") }
+
+    fun lastChannel() {
+        val prevUrl = LiveHistory.list().firstOrNull { it != ch.url }
+        val pool = if (LiveZap.all.isNotEmpty()) LiveZap.all else LiveZap.list
+        val n = pool.firstOrNull { it.url == prevUrl }
+        if (n == null) {
+            android.widget.Toast.makeText(ctx, "No previous channel", android.widget.Toast.LENGTH_SHORT).show()
+        } else {
+            val pos = LiveZap.list.indexOfFirst { it.url == n.url }
+            goTo(n, if (pos >= 0) pos + 1 else 0)
+        }
+    }
+
+    fun jumpNumber() {
+        val n = numBuf.toIntOrNull()
+        numBuf = ""
+        val list = LiveZap.list
+        if (n != null && n in 1..list.size) {
+            goTo(list[n - 1], n)
+        } else if (n != null) {
+            android.widget.Toast.makeText(ctx, "No channel $n", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(numBuf) {
+        if (numBuf.isNotEmpty()) {
+            delay(1600)
+            jumpNumber()
+        }
     }
 
     // Remote control: keep focus on the video so OK / left / right work, return to it after dialogs.
@@ -435,8 +472,28 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 val step = if (repeat > 6) 30_000L else 10_000L
                 when (e.key) {
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.MediaPlayPause -> {
-                        if (player.isPlaying) player.pause() else player.play()
-                        pv?.showController(); true
+                        if (numBuf.isNotEmpty() && e.key != Key.MediaPlayPause) {
+                            jumpNumber()
+                        } else {
+                            if (player.isPlaying) player.pause() else player.play()
+                            pv?.showController()
+                        }
+                        true
+                    }
+                    Key.Zero, Key.One, Key.Two, Key.Three, Key.Four, Key.Five, Key.Six, Key.Seven, Key.Eight, Key.Nine,
+                    Key.NumPad0, Key.NumPad1, Key.NumPad2, Key.NumPad3, Key.NumPad4,
+                    Key.NumPad5, Key.NumPad6, Key.NumPad7, Key.NumPad8, Key.NumPad9 -> {
+                        if (!canZap) {
+                            false
+                        } else {
+                            val d = e.nativeKeyEvent.keyCode.let { kc ->
+                                if (kc >= android.view.KeyEvent.KEYCODE_NUMPAD_0) kc - android.view.KeyEvent.KEYCODE_NUMPAD_0
+                                else kc - android.view.KeyEvent.KEYCODE_0
+                            }
+                            if (d == 0 && numBuf.isEmpty()) lastChannel()
+                            else if (numBuf.length < 4) numBuf += d.toString()
+                            true
+                        }
                     }
                     Key.MediaPlay -> { player.play(); pv?.showController(); true }
                     Key.MediaPause -> { player.pause(); pv?.showController(); true }
@@ -618,6 +675,14 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 )
             }
         }
+        if (numBuf.isNotEmpty() && !PipState.inPip) {
+            Text(
+                numBuf, color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 36.dp)
+                    .clip(RoundedCornerShape(14.dp)).background(Color(0xAA000000))
+                    .padding(horizontal = 24.dp, vertical = 8.dp)
+            )
+        }
         castName?.let { n ->
             if (!PipState.inPip) {
                 CastBar(
@@ -659,6 +724,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 if (canZap) {
                     OverlayBtn("⏮ CH") { zap(-1) }
                     OverlayBtn("CH ⏭") { zap(1) }
+                    OverlayBtn("↩ Last") { lastChannel() }
                 }
                 OverlayBtn("🔊 Audio", Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
