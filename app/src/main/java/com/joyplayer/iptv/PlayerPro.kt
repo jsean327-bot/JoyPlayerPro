@@ -131,10 +131,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     }
     val baseItem = remember(ch.url) { MediaItem.fromUri(AppPrefs.fmtUrl(ch.url)) }
     val shared = remember(ch.url) { SharedLive.takeFor(ch.url) }
+    val triedAlt = remember(ch.url) { mutableSetOf<String>() }
     ResumeStore.init(ctx)
     val resumeAt = remember(ch.url) { if (hasMeta && shared == null) ResumeStore.get(ch.url) else 0L }
     val player = shared ?: remember(ch.url) {
-        ExoPlayer.Builder(ctx).build().apply {
+        PlayerFactory.create(ctx).apply {
             if (resumeAt > 0L) setMediaItem(baseItem, resumeAt) else setMediaItem(baseItem)
             prepare(); playWhenReady = true
         }
@@ -189,9 +190,19 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                android.widget.Toast.makeText(
-                    ctx, "Playback error: ${error.errorCodeName}", android.widget.Toast.LENGTH_LONG
-                ).show()
+                if (shared != null) return   // the live preview player reports its own errors
+                val cur = player.currentMediaItem?.localConfiguration?.uri?.toString()
+                val alt = cur?.let { PlayerFactory.altUrl(it) }
+                if (cur != null && alt != null && cur !in triedAlt) {
+                    triedAlt.add(cur); triedAlt.add(alt)
+                    player.setMediaItem(MediaItem.fromUri(alt))
+                    player.prepare()
+                    player.playWhenReady = true
+                } else {
+                    android.widget.Toast.makeText(
+                        ctx, "Playback error: ${PlayerFactory.describe(error)}", android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
             }
         }
         player.addListener(l)
