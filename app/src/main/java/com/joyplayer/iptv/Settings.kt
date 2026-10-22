@@ -308,6 +308,7 @@ fun SettingsScreen(
         "clock" to "🕒  Time Format",
         "sub" to "💬  Subtitle Settings",
         "pip" to "🖼️  PIP Settings",
+        "backup" to "💾  Backup & Restore",
         "update" to "⬆️  Update Now"
     )
 
@@ -500,6 +501,7 @@ fun SettingsScreen(
             }
         }
         "pip" -> PipDialog { dialog = "" }
+        "backup" -> BackupDialog { dialog = "" }
         "update" -> UpdateDialog { dialog = "" }
         "parental" -> ParentalDialog(active, channels) { dialog = "" }
         "hlive" -> CategoryPickerLoader("live", false, active, channels) { dialog = "" }
