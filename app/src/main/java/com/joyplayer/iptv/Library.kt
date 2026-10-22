@@ -150,6 +150,14 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(error ?: "", color = Color(0xFFFF8A8A))
             }
+            AppPrefs.listLayout -> LazyColumn(
+                contentPadding = PaddingValues(12.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(shown) { item ->
+                    PosterRow(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) })
+                }
+            }
             else -> LazyVerticalGrid(
                 GridCells.Adaptive(AppPrefs.posterDp.dp),
                 contentPadding = PaddingValues(12.dp),
@@ -253,6 +261,39 @@ fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Un
             item.name, color = Color.White, fontSize = 12.sp, maxLines = 2,
             overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
             modifier = Modifier.fillMaxWidth().padding(6.dp)
+        )
+    }
+}
+
+@Composable
+fun PosterRow(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
+            .clickable(onClick = onClick).padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        AsyncImage(
+            item.poster, null,
+            Modifier.width(56.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)).background(Color.Black),
+            contentScale = ContentScale.Crop
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                item.name, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                maxLines = 2, overflow = TextOverflow.Ellipsis
+            )
+            if (item.rating > 0.0) {
+                Text(
+                    "%.1f".format(item.rating), color = Color.White, fontSize = 11.sp,
+                    modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(4.dp))
+                        .background(C.Blue).padding(horizontal = 6.dp, vertical = 1.dp)
+                )
+            }
+        }
+        Text(
+            if (fav) "★" else "☆", color = Color(0xFFFFD54F), fontSize = 24.sp,
+            modifier = Modifier.clickable(onClick = onFav).padding(10.dp)
         )
     }
 }
