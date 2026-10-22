@@ -38,6 +38,7 @@ fun JoyApp() {
     val ctx = LocalContext.current
     AppPrefs.init(ctx)
     ContentCache.init(ctx)
+    XmlTv.init(ctx)
     val store = remember { ListStore(ctx) }
     val favStore = remember { FavStore(ctx) }
     val prefs = remember { ctx.getSharedPreferences("joyplayer_app", android.content.Context.MODE_PRIVATE) }
@@ -84,6 +85,7 @@ fun JoyApp() {
                         val fresh =
                             if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
                         ContentCache.putChannels(l, fresh)
+                        if (l.type == "m3u") AppPrefs.setEpgAuto(l.id, SmartList.lastEpg)
                         fresh
                     } catch (e: kotlinx.coroutines.CancellationException) {
                         throw e
@@ -93,6 +95,7 @@ fun JoyApp() {
                     }
                 }
                 channels = res; active = l
+                XmlTv.activeUrl = AppPrefs.epgUrl(l.id)
                 prefs.edit().putString("last", l0.id).apply()
                 onOk()
             } catch (e: kotlinx.coroutines.CancellationException) {
