@@ -135,6 +135,7 @@ fun JoyApp() {
                     onAdd = { error = null; adding = true }
                 )
             }
+            screen == "account" -> AccountScreen(active) { screen = "home" }
             screen == "settings" -> SettingsScreen(
                 active = active, channels = channels,
                 onBack = { screen = "home" },
@@ -160,7 +161,7 @@ fun JoyApp() {
                 active?.name ?: if (lists.isEmpty()) "No playlist" else "",
                 loading, error,
                 onNav = { go(it) },
-                onSoon = { toast("قريباً") },
+                onSoon = { if (active != null) screen = "account" else toast("اتصل بقائمة أولاً") },
                 onChange = { error = null; screen = "playlists" },
                 onReload = {
                     val l = active
