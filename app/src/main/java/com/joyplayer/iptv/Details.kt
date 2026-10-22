@@ -194,12 +194,33 @@ fun DetailScreen(
         loading = false
     }
 
+    ResumeStore.init(ctx)
+    val resumeVer = ResumeStore.version
+    val queue = remember(seasons) {
+        seasons.flatMap { (sn, list) ->
+            list.map { e ->
+                e.ch to SubMeta(PlayMeta.cleanTitle(item.name), PlayMeta.year(item.name), sn.toIntOrNull(), e.num)
+            }
+        }
+    }
+    LaunchedEffect(queue) {
+        if (isSeries && queue.isNotEmpty()) { PlayQueue.items = queue; PlayQueue.play = onPlay }
+    }
+
     fun playMovie() {
+        PlayQueue.clear()
         PlayMeta.map[item.url] = SubMeta(PlayMeta.cleanTitle(item.name), PlayMeta.year(item.name), null, null)
         onPlay(Channel(item.name, item.url, item.poster, item.cat))
     }
 
+    fun playQueued(ch: Channel, meta: SubMeta) {
+        PlayQueue.items = queue; PlayQueue.play = onPlay
+        PlayMeta.map[ch.url] = meta
+        onPlay(ch)
+    }
+
     fun playEp(s: String, ep: Ep) {
+        PlayQueue.items = queue; PlayQueue.play = onPlay
         PlayMeta.map[ep.ch.url] =
             SubMeta(PlayMeta.cleanTitle(item.name), PlayMeta.year(item.name), s.toIntOrNull(), ep.num)
         onPlay(ep.ch)
@@ -244,9 +265,12 @@ fun DetailScreen(
                 Spacer(Modifier.width(18.dp))
                 Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        val cont = if (isSeries && resumeVer >= 0) PlayQueue.continuePoint()?.takeIf { c -> queue.any { it.first.url == c.first.url } } else null
+                        val movieResume = !isSeries && resumeVer >= 0 && ResumeStore.get(item.url) > 0L
                         Button(
                             onClick = {
                                 if (!isSeries) playMovie()
+                                else if (cont != null) playQueued(cont.first, cont.second)
                                 else {
                                     val s = season
                                     val ep = s?.let { seasons[it]?.firstOrNull() }
@@ -254,7 +278,15 @@ fun DetailScreen(
                                 }
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = C.Blue)
-                        ) { Text("▶  Watch Now") }
+                        ) {
+                            Text(
+                                when {
+                                    cont != null -> "▶  Continue S${cont.second.season ?: 1} E${cont.second.episode ?: 1}"
+                                    movieResume -> "▶  Resume"
+                                    else -> "▶  Watch Now"
+                                }
+                            )
+                        }
                         Button(
                             onClick = { openTrailer() },
                             colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
@@ -292,7 +324,7 @@ fun DetailScreen(
                         season?.let { s ->
                             seasons[s].orEmpty().forEach { ep ->
                                 Text(
-                                    "▶  ${ep.num}. ${ep.ch.name}", color = Color.White, fontSize = 15.sp,
+                                    (if (ResumeStore.isDone(ep.ch.url)) "✓  " else "▶  ") + "${ep.num}. ${ep.ch.name}", color = Color.White, fontSize = 15.sp,
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
                                         .clip(RoundedCornerShape(6.dp)).background(Color(0x55000000))
                                         .clickable { playEp(s, ep) }.padding(12.dp)
