@@ -7,6 +7,8 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -140,7 +142,7 @@ fun AddScreen(loading: Boolean, error: String?, onSave: (SavedList) -> Unit) {
     var server by remember { mutableStateOf("") }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
         Text("JoyPlayer IPTV", style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(16.dp))
         TabRow(tab) {
