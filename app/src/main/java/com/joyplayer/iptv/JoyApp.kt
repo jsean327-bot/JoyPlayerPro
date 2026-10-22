@@ -173,7 +173,8 @@ fun JoyApp() {
                         ?: lists.firstOrNull()
                     if (l != null) openList(l) else toast("أضف قائمة أولاً من Change Playlist")
                 },
-                onExit = { (ctx as? Activity)?.finish() }
+                onExit = { (ctx as? Activity)?.finish() },
+                onPlay = { playing = it }
             )
         }
         playing?.let { ProPlayer(it) { playing = null } }
