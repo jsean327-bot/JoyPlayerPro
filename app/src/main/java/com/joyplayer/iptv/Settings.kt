@@ -236,7 +236,6 @@ fun SettingsScreen(
     fun tap(id: String) {
         when (id) {
             "playlist" -> onPlaylists()
-            "lang" -> toast("App language: English")
             else -> dialog = id
         }
     }
@@ -270,6 +269,11 @@ fun SettingsScreen(
     }
 
     when (dialog) {
+        "lang" -> SDialog("Choose language", { dialog = "" }) {
+            Lang.codes.forEachIndexed { i, c ->
+                SOpt(Lang.names[i], Lang.code == c) { Lang.set(c); dialog = "" }
+            }
+        }
         "layout" -> ChoiceDialog(
             "Poster size (Movies & Series)", listOf("Small", "Medium", "Large"), AppPrefs.posterSize,
             { AppPrefs.posterSize = it; dialog = "" }, { dialog = "" }
