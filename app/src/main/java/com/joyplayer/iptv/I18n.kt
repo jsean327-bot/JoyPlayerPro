@@ -302,6 +302,12 @@ Playback speed|سرعة التشغيل|Vitesse de lecture|Velocidad de reproducc
 Normal (1x)|عادية (1x)|Normale (1x)|Normal (1x)|Normal (1x)|Normale (1x)|Normal (1x)|Обычная (1x)|Normal (1x)
 Sleep timer|مؤقت النوم|Minuterie de sommeil|Temporizador de sueño|Einschlaftimer|Timer di spegnimento|Temporizador de sono|Таймер сна|Uyku zamanlayıcı
 Sleep|نوم|Veille|Dormir|Schlaf|Sleep|Dormir|Сон|Uyku
+Cast to|بث إلى|Diffuser sur|Transmitir a|Streamen auf|Trasmetti a|Transmitir para|Транслировать на|Şuraya yayınla
+Searching for devices on your Wi-Fi...|جارٍ البحث عن أجهزة على شبكة Wi-Fi...|Recherche d'appareils sur votre Wi-Fi...|Buscando dispositivos en tu Wi-Fi...|Suche nach Geräten im WLAN...|Ricerca di dispositivi sul Wi-Fi...|Procurando dispositivos no Wi-Fi...|Поиск устройств в Wi-Fi...|Wi-Fi ağında cihazlar aranıyor...
+Stop casting|إيقاف البث|Arrêter la diffusion|Detener transmisión|Streaming beenden|Interrompi trasmissione|Parar transmissão|Остановить трансляцию|Yayını durdur
+Casting to ~|البث إلى|Diffusion sur|Transmitiendo a|Streamt auf|Trasmissione a|Transmitindo para|Трансляция на|Yayınlanıyor:
+Cast|بث|Cast|Cast|Cast|Cast|Cast|Cast|Cast
+Stop|إيقاف|Arrêter|Detener|Stopp|Ferma|Parar|Стоп|Durdur
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
