@@ -154,7 +154,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     LaunchedEffect(player) {
         while (true) {
             delay(5000)
-            if (hasMeta && shared == null && player.isPlaying) ResumeStore.save(ch.url, player.currentPosition, player.duration)
+            if (hasMeta && shared == null && player.isPlaying) ResumeStore.save(ch.url, player.currentPosition, player.duration, ch.name, ch.logo)
         }
     }
     PipSupport(player)
@@ -203,6 +203,27 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     var boxFocused by remember { mutableStateOf(false) }
     var pv by remember { mutableStateOf<PlayerView?>(null) }
 
+    // Live channel zapping (inside the list the user was browsing)
+    val canZap = !hasMeta && LiveZap.list.size > 1
+    fun zap(d: Int) {
+        val list = LiveZap.list
+        val i = list.indexOfFirst { it.url == ch.url }
+        if (i < 0 || list.size < 2) return
+        val n = list[((i + d) % list.size + list.size) % list.size]
+        // keep using the one live connection: switch the shared player to the new channel
+        SharedLive.player?.let { sp ->
+            if (shared != null) {
+                sp.setMediaItem(MediaItem.fromUri(AppPrefs.fmtUrl(n.url)))
+                sp.prepare()
+                sp.playWhenReady = true
+            }
+        }
+        LiveZap.onSelect?.invoke(n)
+        android.widget.Toast.makeText(ctx, "${((i + d) % list.size + list.size) % list.size + 1}. ${n.name}", android.widget.Toast.LENGTH_SHORT).show()
+        pv?.showController()
+        LiveZap.play?.invoke(n)
+    }
+
     // Remote control: keep focus on the video so OK / left / right work, return to it after dialogs.
     LaunchedEffect(dialog, overlay) {
         if (dialog.isEmpty() && (overlay || !boxFocused)) {
@@ -220,7 +241,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     val nx = PlayQueue.nextAfter(ch.url)
                     val go = PlayQueue.play
                     if (nx != null && go != null) {
-                        ResumeStore.save(ch.url, player.duration, player.duration)
+                        ResumeStore.save(ch.url, player.duration, player.duration, ch.name, ch.logo)
                         PlayMeta.map[nx.first.url] = nx.second
                         android.widget.Toast.makeText(ctx, "Next episode: ${nx.first.name}", android.widget.Toast.LENGTH_SHORT).show()
                         go(nx.first)
@@ -236,7 +257,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         player.addListener(l)
         onDispose {
             player.removeListener(l)
-            if (hasMeta && shared == null) ResumeStore.save(ch.url, player.currentPosition, player.duration)
+            if (hasMeta && shared == null) ResumeStore.save(ch.url, player.currentPosition, player.duration, ch.name, ch.logo)
             if (shared == null) player.release() else SharedLive.restorePreview()
         }
     }
@@ -315,11 +336,18 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                         if (player.isCurrentMediaItemSeekable) player.seekTo(player.currentPosition + step)
                         pv?.showController(); true
                     }
-                    Key.DirectionUp, Key.Menu -> {
+                    Key.ChannelUp -> { if (canZap) zap(1) else pv?.showController(); true }
+                    Key.ChannelDown -> { if (canZap) zap(-1) else pv?.showController(); true }
+                    Key.DirectionUp -> {
+                        if (canZap) zap(-1)
+                        else if (overlay) runCatching { firstBtnFr.requestFocus() } else pv?.showController()
+                        true
+                    }
+                    Key.Menu -> {
                         if (overlay) runCatching { firstBtnFr.requestFocus() } else pv?.showController()
                         true
                     }
-                    Key.DirectionDown -> { pv?.showController(); true }
+                    Key.DirectionDown -> { if (canZap) zap(1) else pv?.showController(); true }
                     else -> false
                 }
             }
@@ -378,6 +406,10 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     },
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (canZap) {
+                    OverlayBtn("⏮ CH") { zap(-1) }
+                    OverlayBtn("CH ⏭") { zap(1) }
+                }
                 OverlayBtn("🔊 Audio", Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
