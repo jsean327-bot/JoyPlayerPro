@@ -173,6 +173,7 @@ fun DetailScreen(
 ) {
     BackHandler(onBack = onBack)
     val ctx = LocalContext.current
+    val compact = rememberIsCompact()
     var detail by remember(item.id) { mutableStateOf<Detail?>(null) }
     var seasons by remember(item.id) { mutableStateOf<Map<String, List<Ep>>>(emptyMap()) }
     var season by remember(item.id) { mutableStateOf<String?>(null) }
@@ -256,18 +257,13 @@ fun DetailScreen(
             Text("↩", fontSize = 28.sp, color = Color.White, modifier = Modifier.clickable(onClick = onBack).padding(4.dp))
             if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             Spacer(Modifier.height(6.dp))
-            Row(Modifier.fillMaxSize()) {
-                AsyncImage(
-                    poster, null,
-                    Modifier.width(140.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(8.dp)).background(Color.Black),
-                    contentScale = ContentScale.Crop
-                )
-                Spacer(Modifier.width(18.dp))
-                Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+            val info: @Composable ColumnScope.() -> Unit = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         val cont = if (isSeries && resumeVer >= 0) PlayQueue.continuePoint()?.takeIf { c -> queue.any { it.first.url == c.first.url } } else null
                         val movieResume = !isSeries && resumeVer >= 0 && ResumeStore.get(item.url) > 0L
+                        val bw = if (compact) Modifier.weight(1f) else Modifier
                         Button(
+                            modifier = bw,
                             onClick = {
                                 if (!isSeries) playMovie()
                                 else if (cont != null) playQueued(cont.first, cont.second)
@@ -288,6 +284,7 @@ fun DetailScreen(
                             )
                         }
                         Button(
+                            modifier = bw,
                             onClick = { openTrailer() },
                             colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
                         ) { Text("🎬  Trailer") }
@@ -333,6 +330,29 @@ fun DetailScreen(
                         }
                     }
                     Spacer(Modifier.height(16.dp))
+            }
+            if (compact) {
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                    AsyncImage(
+                        poster, null,
+                        Modifier.height(190.dp).aspectRatio(2f / 3f).align(Alignment.CenterHorizontally)
+                            .clip(RoundedCornerShape(8.dp)).background(Color.Black),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    info()
+                }
+            } else {
+                Row(Modifier.fillMaxSize()) {
+                    AsyncImage(
+                        poster, null,
+                        Modifier.width(140.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(8.dp)).background(Color.Black),
+                        contentScale = ContentScale.Crop
+                    )
+                    Spacer(Modifier.width(18.dp))
+                    Column(Modifier.weight(1f).fillMaxHeight().verticalScroll(rememberScrollState())) {
+                        info()
+                    }
                 }
             }
         }
