@@ -8,7 +8,10 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 import retrofit2.http.Query
 
-data class Channel(val name: String, val url: String, val logo: String?, val group: String)
+data class Channel(
+    val name: String, val url: String, val logo: String?, val group: String,
+    val tvgId: String? = null
+)
 
 object M3uParser {
     private val attr = Regex("""([\w-]+)="([^"]*)"""")
