@@ -85,6 +85,12 @@ object AppPrefs {
         get() = if (p?.contains("subbg") == true) gi("subbg", 0)
         else if (subBox) android.graphics.Color.argb(170, 0, 0, 0) else android.graphics.Color.TRANSPARENT
         set(v) { pi("subbg", v) }
+    /** Program-guide link of a playlist: the one typed in Settings, else the one found in the M3U header. */
+    fun epgUrl(listId: String): String = epgManual(listId).ifBlank { p?.getString("epg_auto_$listId", "") ?: "" }
+    fun epgManual(listId: String): String = p?.getString("epg_$listId", "") ?: ""
+    fun setEpgManual(listId: String, v: String) { p?.edit()?.putString("epg_$listId", v.trim())?.apply() }
+    fun setEpgAuto(listId: String, v: String) { p?.edit()?.putString("epg_auto_$listId", v.trim())?.apply() }
+
     var listLayout: Boolean
         get() = gi("listlayout", 0) == 1
         set(v) { pi("listlayout", if (v) 1 else 0) }
@@ -308,6 +314,7 @@ fun SettingsScreen(
         "clock" to "🕒  Time Format",
         "sub" to "💬  Subtitle Settings",
         "pip" to "🖼️  PIP Settings",
+        "epg" to "📅  EPG (XMLTV)",
         "backup" to "💾  Backup & Restore",
         "update" to "⬆️  Update Now"
     )
@@ -502,6 +509,40 @@ fun SettingsScreen(
         }
         "pip" -> PipDialog { dialog = "" }
         "backup" -> BackupDialog { dialog = "" }
+        "epg" -> SDialog("EPG (XMLTV)", { dialog = "" }, maxHeight = 380.dp) {
+            if (active == null) {
+                Text("Connect to a playlist first", color = Color(0xFFFF8A8A), fontSize = 13.sp)
+            } else {
+                var url by remember { mutableStateOf(AppPrefs.epgManual(active.id)) }
+                val auto = AppPrefs.epgUrl(active.id).takeIf { AppPrefs.epgManual(active.id).isBlank() }.orEmpty()
+                Text(
+                    "Program guide for M3U playlists. Leave empty to use the link found inside the playlist.",
+                    color = C.Text, fontSize = 13.sp
+                )
+                if (auto.isNotBlank()) Text(auto, color = Color(0xFF6EE7A0), fontSize = 12.sp)
+                OutlinedTextField(
+                    url, { url = it }, singleLine = true, label = { Text("XMLTV link (.xml or .xml.gz)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button(
+                        onClick = {
+                            AppPrefs.setEpgManual(active.id, url)
+                            XmlTv.activeUrl = AppPrefs.epgUrl(active.id)
+                            XmlTv.reset()
+                            dialog = ""
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("OK") }
+                    Button(
+                        onClick = { dialog = "" },
+                        colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark),
+                        modifier = Modifier.weight(1f)
+                    ) { Text("Cancel") }
+                }
+            }
+        }
         "update" -> UpdateDialog { dialog = "" }
         "parental" -> ParentalDialog(active, channels) { dialog = "" }
         "hlive" -> CategoryPickerLoader("live", false, active, channels) { dialog = "" }
