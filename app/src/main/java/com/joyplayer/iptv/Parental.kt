@@ -39,8 +39,8 @@ fun PinField(value: String, label: String, onChange: (String) -> Unit) {
 fun PinGate(onOk: () -> Unit, onDismiss: () -> Unit) {
     var pin by remember { mutableStateOf("") }
     var err by remember { mutableStateOf<String?>(null) }
-    SDialog("Enter PIN", onDismiss) {
-        PinField(pin, "PIN") {
+    SDialog("Access Restricted", onDismiss) {
+        PinField(pin, "Enter PIN") {
             pin = it
             err = null
             if (it.length == 4 && AppPrefs.checkPin(it)) onOk()
