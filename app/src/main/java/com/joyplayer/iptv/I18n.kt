@@ -309,6 +309,9 @@ Casting to ~|البث إلى|Diffusion sur|Transmitiendo a|Streamt auf|Trasmissi
 Cast|بث|Cast|Cast|Cast|Cast|Cast|Cast|Cast
 Stop|إيقاف|Arrêter|Detener|Stopp|Ferma|Parar|Стоп|Durdur
 Last|السابقة|Précédente|Anterior|Zurück|Precedente|Anterior|Предыдущий|Önceki
+EPG (XMLTV)|دليل البرامج (XMLTV)|Guide TV (XMLTV)|Guía TV (XMLTV)|TV-Programm (XMLTV)|Guida TV (XMLTV)|Guia de TV (XMLTV)|Телепрограмма (XMLTV)|TV rehberi (XMLTV)
+Program guide for M3U playlists. Leave empty to use the link found inside the playlist.|دليل البرامج لقوائم M3U. اتركه فارغاً لاستخدام الرابط الموجود داخل القائمة.|Guide des programmes pour les playlists M3U. Laissez vide pour utiliser le lien de la playlist.|Guía de programación para listas M3U. Déjalo vacío para usar el enlace de la lista.|Programmführer für M3U-Playlists. Leer lassen, um den Link aus der Playlist zu nutzen.|Guida programmi per playlist M3U. Lascia vuoto per usare il link della playlist.|Guia de programação para listas M3U. Deixe vazio para usar o link da lista.|Телепрограмма для M3U-плейлистов. Оставьте пустым, чтобы использовать ссылку из плейлиста.|M3U listeleri için program rehberi. Listedeki bağlantıyı kullanmak için boş bırakın.
+XMLTV link (.xml or .xml.gz)|رابط XMLTV (.xml أو .xml.gz)|Lien XMLTV (.xml ou .xml.gz)|Enlace XMLTV (.xml o .xml.gz)|XMLTV-Link (.xml oder .xml.gz)|Link XMLTV (.xml o .xml.gz)|Link XMLTV (.xml ou .xml.gz)|Ссылка XMLTV (.xml или .xml.gz)|XMLTV bağlantısı (.xml veya .xml.gz)
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
