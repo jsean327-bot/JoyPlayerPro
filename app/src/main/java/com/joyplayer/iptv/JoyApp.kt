@@ -37,6 +37,7 @@ import kotlinx.coroutines.withContext
 fun JoyApp() {
     val ctx = LocalContext.current
     AppPrefs.init(ctx)
+    ContentCache.init(ctx)
     val store = remember { ListStore(ctx) }
     val favStore = remember { FavStore(ctx) }
     val prefs = remember { ctx.getSharedPreferences("joyplayer_app", android.content.Context.MODE_PRIVATE) }
@@ -67,14 +68,28 @@ fun JoyApp() {
 
     fun toast(msg: String) = Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
 
-    fun openList(l0: SavedList, onOk: () -> Unit = {}) {
+    fun openList(l0: SavedList, force: Boolean = false, onOk: () -> Unit = {}) {
         job?.cancel()
         job = scope.launch {
             loading = true; error = null
             try {
                 val l = SmartList.normalize(l0)
+                if (force) {
+                    ContentCache.clear(l.id)
+                    Vod.invalidate(l.id)
+                }
                 val res = withContext(Dispatchers.IO) {
-                    if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
+                    ContentCache.channels(l) ?: try {
+                        val fresh =
+                            if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
+                        ContentCache.putChannels(l, fresh)
+                        fresh
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        // no connection: fall back to the last saved copy
+                        ContentCache.channels(l, ignoreAge = true) ?: throw e
+                    }
                 }
                 channels = res; active = l
                 prefs.edit().putString("last", l0.id).apply()
@@ -171,7 +186,7 @@ fun JoyApp() {
                     val l = active
                         ?: lists.firstOrNull { it.id == prefs.getString("last", null) }
                         ?: lists.firstOrNull()
-                    if (l != null) openList(l) else toast("أضف قائمة أولاً من Change Playlist")
+                    if (l != null) openList(l, force = true) else toast("أضف قائمة أولاً من Change Playlist")
                 },
                 onExit = { (ctx as? Activity)?.finish() },
                 onPlay = { playing = it }
