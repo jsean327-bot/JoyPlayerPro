@@ -385,6 +385,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     var startPos = 0L
                     var target = 0L
 
+                    var vMode = 0          // 0 = undecided, 1 = vertical swipe, 2 = other
+                    var vLeft = false
+                    var level = 0f
+                    val audio = c.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+
                     fun canSeek(): Boolean = hasMeta && exo.isCurrentMediaItemSeekable
 
                     fun skipBy(ms: Long) {
@@ -400,6 +405,46 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
 
                     val gd = GestureDetector(c, object : GestureDetector.SimpleOnGestureListener() {
                         override fun onDown(e: MotionEvent): Boolean = true
+
+                        override fun onScroll(e1: MotionEvent?, e2: MotionEvent, dx: Float, dy: Float): Boolean {
+                            if (scrubbing || e1 == null) return false
+                            val win = (c as? Activity)?.window
+                            if (vMode == 0) {
+                                vMode = if (kotlin.math.abs(dy) > kotlin.math.abs(dx) * 1.5f) 1 else 2
+                                vLeft = e1.x < view.width / 2f
+                                if (vMode == 1) {
+                                    level = if (vLeft) {
+                                        val cur = win?.attributes?.screenBrightness ?: -1f
+                                        if (cur >= 0f) cur else runCatching {
+                                            android.provider.Settings.System.getInt(
+                                                c.contentResolver, android.provider.Settings.System.SCREEN_BRIGHTNESS
+                                            ) / 255f
+                                        }.getOrDefault(0.5f)
+                                    } else {
+                                        audio.getStreamVolume(android.media.AudioManager.STREAM_MUSIC).toFloat() /
+                                            audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC).coerceAtLeast(1)
+                                    }
+                                }
+                            }
+                            if (vMode != 1) return false
+                            val h = view.height.toFloat().coerceAtLeast(1f)
+                            level = (level + dy / h * 1.3f).coerceIn(if (vLeft) 0.02f else 0f, 1f)
+                            val pct = (level * 100).toInt()
+                            if (vLeft) {
+                                if (win != null) {
+                                    val lp = win.attributes
+                                    lp.screenBrightness = level
+                                    win.attributes = lp
+                                }
+                                seekHud = "🔆  $pct%"
+                            } else {
+                                val max = audio.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                                audio.setStreamVolume(android.media.AudioManager.STREAM_MUSIC, (level * max).toInt(), 0)
+                                seekHud = (if (pct == 0) "🔇  " else "🔊  ") + "$pct%"
+                            }
+                            hudTick++
+                            return true
+                        }
 
                         override fun onDoubleTap(e: MotionEvent): Boolean {
                             if (!canSeek()) { back(); return true }
@@ -425,8 +470,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                         }
                     })
                     setOnTouchListener { _, e ->
+                        if (e.actionMasked == MotionEvent.ACTION_DOWN) vMode = 0
                         gd.onTouchEvent(e)
-                        if (scrubbing) {
+                        if (vMode == 1 && !scrubbing) {
+                            true
+                        } else if (scrubbing) {
                             when (e.actionMasked) {
                                 MotionEvent.ACTION_MOVE -> {
                                     val w = view.width.toFloat().coerceAtLeast(1f)
