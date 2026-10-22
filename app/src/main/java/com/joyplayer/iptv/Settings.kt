@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -62,6 +64,27 @@ object AppPrefs {
     var autoUpdate: Int
         get() = gi("autoupdate", 1)
         set(v) { pi("autoupdate", v) }
+    var subEnabled: Boolean
+        get() = gi("subenabled", 1) == 1
+        set(v) { pi("subenabled", if (v) 1 else 0) }
+    /** Subtitle size in px (40 = normal). Falls back to the old 4-step setting. */
+    var subPx: Int
+        get() {
+            val v = gi("subpx", -1)
+            return if (v > 0) v else listOf(30, 40, 52, 68)[subSize.coerceIn(0, 3)]
+        }
+        set(v) { pi("subpx", v) }
+    var subFg: Int
+        get() = if (p?.contains("subfg") == true) gi("subfg", 0) else when (subColor) {
+            1 -> android.graphics.Color.YELLOW
+            2 -> android.graphics.Color.CYAN
+            else -> android.graphics.Color.WHITE
+        }
+        set(v) { pi("subfg", v) }
+    var subBg: Int
+        get() = if (p?.contains("subbg") == true) gi("subbg", 0)
+        else if (subBox) android.graphics.Color.argb(170, 0, 0, 0) else android.graphics.Color.TRANSPARENT
+        set(v) { pi("subbg", v) }
     var listLayout: Boolean
         get() = gi("listlayout", 0) == 1
         set(v) { pi("listlayout", if (v) 1 else 0) }
@@ -116,14 +139,10 @@ object AppPrefs {
 
     fun styleSubtitles(v: PlayerView) {
         val sv = v.subtitleView ?: return
-        val mult = listOf(0.75f, 1f, 1.3f, 1.7f)[subSize.coerceIn(0, 3)]
-        sv.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * mult)
-        val fg = when (subColor) {
-            1 -> android.graphics.Color.YELLOW
-            2 -> android.graphics.Color.CYAN
-            else -> android.graphics.Color.WHITE
-        }
-        val bg = if (subBox) android.graphics.Color.argb(170, 0, 0, 0) else android.graphics.Color.TRANSPARENT
+        sv.visibility = if (subEnabled) android.view.View.VISIBLE else android.view.View.GONE
+        sv.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * (subPx / 40f))
+        val fg = subFg
+        val bg = subBg
         sv.setStyle(
             CaptionStyleCompat(
                 fg, bg, android.graphics.Color.TRANSPARENT,
@@ -172,6 +191,40 @@ fun SOpt(label: String, selected: Boolean, onClick: () -> Unit) {
     }
 }
 
+private val subFgColors = listOf(
+    0xFFFFFFFF.toInt(), 0xFFFFEB3B.toInt(), 0xFF00E5FF.toInt(), 0xFF69F0AE.toInt(),
+    0xFFFFA726.toInt(), 0xFFFF80AB.toInt(), 0xFFEF5350.toInt(), 0xFF64B5F6.toInt()
+)
+private val subBgColors = listOf(
+    0x00000000, 0xFF000000.toInt(), 0xAA000000.toInt(), 0xFF303030.toInt(),
+    0xFF0D1B4A.toInt(), 0xFF4A0E22.toInt()
+)
+
+@Composable
+private fun ColorChoices(colors: List<Int>, selected: Int, onPick: (Int) -> Unit) {
+    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        colors.forEach { c ->
+            val none = (c ushr 24) == 0
+            val sel = c == selected
+            Box(
+                Modifier.size(36.dp).clip(RoundedCornerShape(6.dp))
+                    .background(if (none) Color(0xFF555555) else Color(c))
+                    .border(if (sel) 3.dp else 1.dp, if (sel) Color.White else Color(0x66FFFFFF), RoundedCornerShape(6.dp))
+                    .clickable { onPick(c) },
+                contentAlignment = Alignment.Center
+            ) { if (none) Text("∅", color = Color.White) }
+        }
+    }
+}
+
+@Composable
+private fun SubBlock(content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(C.Row).padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) { content() }
+}
+
 @Composable
 fun LayoutOpt(label: String, checked: Boolean, onClick: () -> Unit) {
     Row(
@@ -186,7 +239,10 @@ fun LayoutOpt(label: String, checked: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun SDialog(title: String, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+fun SDialog(
+    title: String, onDismiss: () -> Unit, maxHeight: Dp = 240.dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
     Dialog(onDismissRequest = onDismiss) {
         Column(
             Modifier.clip(RoundedCornerShape(12.dp)).background(Color(0xFF14102E)).padding(16.dp),
@@ -194,7 +250,7 @@ fun SDialog(title: String, onDismiss: () -> Unit, content: @Composable ColumnSco
         ) {
             Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             Column(
-                Modifier.heightIn(max = 240.dp).verticalScroll(rememberScrollState()),
+                Modifier.heightIn(max = maxHeight).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) { content() }
         }
@@ -371,36 +427,74 @@ fun SettingsScreen(
                 ) { Text("Cancel") }
             }
         }
-        "sub" -> SDialog("Subtitle Settings", { dialog = "" }) {
-            var size by remember { mutableStateOf(AppPrefs.subSize) }
-            var color by remember { mutableStateOf(AppPrefs.subColor) }
-            var box by remember { mutableStateOf(AppPrefs.subBox) }
+        "sub" -> SDialog("Subtitle Settings", { dialog = "" }, maxHeight = 460.dp) {
+            var enabled by remember { mutableStateOf(AppPrefs.subEnabled) }
+            var px by remember { mutableStateOf(AppPrefs.subPx.toFloat()) }
+            var fg by remember { mutableStateOf(AppPrefs.subFg) }
+            var bg by remember { mutableStateOf(AppPrefs.subBg) }
             var lang by remember { mutableStateOf(subs.lang) }
             var key by remember { mutableStateOf(subs.key) }
-            Text("Size", color = C.Text, fontSize = 13.sp)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("Small", "Normal", "Large", "XL").forEachIndexed { i, n ->
-                    FilterChip(size == i, { size = i; AppPrefs.subSize = i }, { Text(n) })
+            SubBlock {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Enable Subtitle", color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f))
+                    Switch(enabled, { enabled = it })
                 }
             }
-            Text("Color", color = C.Text, fontSize = 13.sp)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                listOf("White", "Yellow", "Cyan").forEachIndexed { i, n ->
-                    FilterChip(color == i, { color = i; AppPrefs.subColor = i }, { Text(n) })
+            SubBlock {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Subtitle Size", color = Color.White, fontSize = 15.sp)
+                    Slider(
+                        px, { px = it }, valueRange = 16f..80f, steps = 15,
+                        modifier = Modifier.weight(1f).padding(horizontal = 10.dp)
+                    )
+                    Text("${px.toInt()}px", color = Color.White, fontSize = 13.sp)
                 }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Switch(box, { box = it; AppPrefs.subBox = it })
-                Text("  Dark background box", color = Color.White, fontSize = 14.sp)
+            SubBlock {
+                Text("Subtitle Color", color = Color.White, fontSize = 15.sp)
+                ColorChoices(subFgColors, fg) { fg = it }
+            }
+            SubBlock {
+                Text("Subtitle Background", color = Color.White, fontSize = 15.sp)
+                ColorChoices(subBgColors, bg) { bg = it }
+            }
+            Box(
+                Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Subtitle Test", color = Color(fg), fontSize = (px * 0.6f).sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.background(Color(bg)).padding(horizontal = 8.dp, vertical = 2.dp)
+                )
             }
             Text("Preferred online language", color = C.Text, fontSize = 13.sp)
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 setLangs.forEach { (code, name) ->
-                    FilterChip(lang == code, { lang = code; subs.lang = code }, { Text(name) })
+                    FilterChip(lang == code, { lang = code }, { Text(name) })
                 }
             }
             OutlinedTextField(key, { key = it }, singleLine = true, label = { Text("SubDL API key") })
-            Button(onClick = { subs.key = key; toast("Saved") }) { Text("Save key") }
+            Text("Get a free key from subdl.com", color = C.Text, fontSize = 12.sp)
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = {
+                        AppPrefs.subEnabled = enabled
+                        AppPrefs.subPx = px.toInt()
+                        AppPrefs.subFg = fg
+                        AppPrefs.subBg = bg
+                        subs.lang = lang
+                        if (key.trim() != subs.key) subs.key = key
+                        dialog = ""
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+                    modifier = Modifier.weight(1f)
+                ) { Text("OK") }
+                Button(
+                    onClick = { dialog = "" },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Cancel") }
+            }
         }
         "pip" -> PipDialog { dialog = "" }
         "update" -> UpdateDialog { dialog = "" }
