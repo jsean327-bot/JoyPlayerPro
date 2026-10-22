@@ -308,6 +308,9 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             },
             modifier = Modifier.fillMaxSize()
         )
+        if (!hasMeta && overlay && dialog.isEmpty() && !PipState.inPip) {
+            EpgBadge(ch, Modifier.align(Alignment.TopStart).padding(12.dp).fillMaxWidth(0.42f))
+        }
         if ((overlay || dialog.isNotEmpty()) && !PipState.inPip) {
             Row(
                 Modifier.align(Alignment.TopEnd).padding(12.dp)
