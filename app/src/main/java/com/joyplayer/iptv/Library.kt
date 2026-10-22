@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
@@ -113,72 +115,117 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
         return
     }
 
-    Column(Modifier.fillMaxSize().background(LibBrush)) {
-        Row(
-            Modifier.fillMaxWidth().background(Color(0x55000000)).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NavItem("Home", false) { onNav("home") }
-            NavItem("Live", false) { onNav("live") }
-            NavItem("Movies", kind == "movies") { onNav("movies") }
-            NavItem("Series", kind == "series") { onNav("series") }
-            Spacer(Modifier.weight(1f))
-            OutlinedTextField(
-                query, { query = it }, singleLine = true,
-                placeholder = { Text("Search...") }, modifier = Modifier.width(240.dp)
-            )
-        }
-        Row(Modifier.fillMaxSize()) {
-            Column(Modifier.weight(0.24f).fillMaxHeight().background(Color(0x33000000)).padding(6.dp)) {
-                Box(
-                    Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp).size(60.dp)
-                        .border(3.dp, Color.White, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) { Text("▶", fontSize = 22.sp, color = Color.White) }
-                Text(
-                    "← Back", color = C.Text,
-                    modifier = Modifier.clickable { onNav("home") }.padding(10.dp)
-                )
-                LazyColumn {
-                    item { CatRow("Resume to Watch", recents.size, cat == "*rec*") { cat = "*rec*" } }
-                    item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
-                    item { CatRow("Favorite", favs.size, cat == "*fav*") { cat = "*fav*" } }
-                    items(groups) { (g, n) -> CatRow(g, n, cat == g) { cat = g } }
+    val compact = rememberIsCompact()
+    val catOptions = remember(groups, all.size, favs.size, recents.size) {
+        listOf(
+            CatOpt("*rec*", "Resume to Watch", recents.size),
+            CatOpt("*all*", "All", all.size),
+            CatOpt("*fav*", "Favorite", favs.size)
+        ) + groups.map { CatOpt(it.first, it.first, it.second) }
+    }
+
+    val sortRow: @Composable () -> Unit = {
+        Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box {
+                Button(
+                    onClick = { menu = true },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
+                ) { Text(orders[order] + "  ▾", fontSize = 13.sp) }
+                DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                    orders.forEachIndexed { i, o ->
+                        DropdownMenuItem(text = { Text(o) }, onClick = { order = i; menu = false })
+                    }
                 }
             }
-            Column(Modifier.weight(0.76f).fillMaxHeight()) {
-                Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box {
-                        Button(
-                            onClick = { menu = true },
-                            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
-                        ) { Text(orders[order] + "  ▾", fontSize = 13.sp) }
-                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                            orders.forEachIndexed { i, o ->
-                                DropdownMenuItem(text = { Text(o) }, onClick = { order = i; menu = false })
-                            }
-                        }
-                    }
-                    Spacer(Modifier.weight(1f))
-                    Text("All(${shown.size})", color = C.Text, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+            Text("All(${shown.size})", color = C.Text, fontWeight = FontWeight.Bold)
+        }
+    }
+
+    val gridArea: @Composable () -> Unit = {
+        when {
+            loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(error ?: "", color = Color(0xFFFF8A8A))
+            }
+            else -> LazyVerticalGrid(
+                GridCells.Adaptive(AppPrefs.posterDp.dp),
+                contentPadding = PaddingValues(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                gridItems(shown) { item ->
+                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) })
                 }
-                when {
-                    loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
+            }
+        }
+    }
+
+    if (compact) {
+        Column(Modifier.fillMaxSize().background(LibBrush)) {
+            Row(
+                Modifier.fillMaxWidth().background(Color(0x55000000))
+                    .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavItem("Home", false) { onNav("home") }
+                NavItem("Live", false) { onNav("live") }
+                NavItem("Movies", kind == "movies") { onNav("movies") }
+                NavItem("Series", kind == "series") { onNav("series") }
+            }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CategoryButton(cat, catOptions, { cat = it }, Modifier.weight(0.42f))
+                OutlinedTextField(
+                    query, { query = it }, singleLine = true,
+                    placeholder = { Text("Search...") }, modifier = Modifier.weight(0.58f)
+                )
+            }
+            sortRow()
+            Box(Modifier.weight(1f).fillMaxWidth()) { gridArea() }
+        }
+    } else {
+        Column(Modifier.fillMaxSize().background(LibBrush)) {
+            Row(
+                Modifier.fillMaxWidth().background(Color(0x55000000)).padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavItem("Home", false) { onNav("home") }
+                NavItem("Live", false) { onNav("live") }
+                NavItem("Movies", kind == "movies") { onNav("movies") }
+                NavItem("Series", kind == "series") { onNav("series") }
+                Spacer(Modifier.weight(1f))
+                OutlinedTextField(
+                    query, { query = it }, singleLine = true,
+                    placeholder = { Text("Search...") }, modifier = Modifier.width(240.dp)
+                )
+            }
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.weight(0.24f).fillMaxHeight().background(Color(0x33000000)).padding(6.dp)) {
+                    Box(
+                        Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp).size(60.dp)
+                            .border(3.dp, Color.White, CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) { Text("▶", fontSize = 22.sp, color = Color.White) }
+                    Text(
+                        "← Back", color = C.Text,
+                        modifier = Modifier.clickable { onNav("home") }.padding(10.dp)
+                    )
+                    LazyColumn {
+                        item { CatRow("Resume to Watch", recents.size, cat == "*rec*") { cat = "*rec*" } }
+                        item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
+                        item { CatRow("Favorite", favs.size, cat == "*fav*") { cat = "*fav*" } }
+                        items(groups) { (g, n) -> CatRow(g, n, cat == g) { cat = g } }
                     }
-                    error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(error ?: "", color = Color(0xFFFF8A8A))
-                    }
-                    else -> LazyVerticalGrid(
-                        GridCells.Adaptive(AppPrefs.posterDp.dp),
-                        contentPadding = PaddingValues(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        gridItems(shown) { item ->
-                            PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) })
-                        }
-                    }
+                }
+                Column(Modifier.weight(0.76f).fillMaxHeight()) {
+                    sortRow()
+                    gridArea()
                 }
             }
         }
