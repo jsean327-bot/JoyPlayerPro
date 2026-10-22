@@ -275,6 +275,7 @@ Subtitle Color|لون الترجمة|Couleur des sous-titres|Color de subtítulo
 Subtitle Background|خلفية الترجمة|Fond des sous-titres|Fondo de subtítulos|Untertitelhintergrund|Sfondo sottotitoli|Fundo da legenda|Фон субтитров|Altyazı arka planı
 Subtitle Test|اختبار الترجمة|Test de sous-titre|Prueba de subtítulo|Untertitel-Test|Test sottotitolo|Teste de legenda|Проверка субтитров|Altyazı testi
 Get a free key from subdl.com|احصل على مفتاح مجاني من subdl.com|Obtenez une clé gratuite sur subdl.com|Obtén una clave gratis en subdl.com|Hol dir einen kostenlosen Schlüssel auf subdl.com|Ottieni una chiave gratuita su subdl.com|Obtenha uma chave grátis em subdl.com|Получите бесплатный ключ на subdl.com|subdl.com'dan ücretsiz anahtar alın
+Access Restricted|الوصول مقيّد|Accès restreint|Acceso restringido|Zugriff beschränkt|Accesso limitato|Acesso restrito|Доступ ограничен|Erişim kısıtlı
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
