@@ -47,6 +47,7 @@ fun JoyApp() {
     var active by remember { mutableStateOf<SavedList?>(null) }
     var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var screen by remember { mutableStateOf("home") }
+    var playlistsFrom by remember { mutableStateOf("home") }
     var playing by remember { mutableStateOf<Channel?>(null) }
     var loading by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -138,10 +139,10 @@ fun JoyApp() {
                 }
             }
             screen == "playlists" -> {
-                BackHandler(enabled = playing == null) { screen = "home" }
+                BackHandler(enabled = playing == null) { screen = playlistsFrom }
                 PlaylistsScreen(
-                    lists, active?.id, false, error, { screen = "home" },
-                    onConnect = { screen = "home"; openList(it) },
+                    lists, active?.id, false, error, { screen = playlistsFrom },
+                    onConnect = { screen = playlistsFrom; openList(it) },
                     onSave = { u ->
                         lists = lists.map { if (it.id == u.id) u else it }
                         store.save(lists)
@@ -158,7 +159,7 @@ fun JoyApp() {
             screen == "settings" -> SettingsScreen(
                 active = active, channels = channels,
                 onBack = { screen = "home" },
-                onPlaylists = { screen = "playlists" }
+                onPlaylists = { playlistsFrom = "settings"; screen = "playlists" }
             )
             (screen == "movies" || screen == "series") && channels.isNotEmpty() -> {
                 BackHandler(enabled = playing == null) { screen = "home" }
@@ -181,7 +182,7 @@ fun JoyApp() {
                 loading, error,
                 onNav = { go(it) },
                 onSoon = { if (active != null) screen = "account" else toast("اتصل بقائمة أولاً") },
-                onChange = { error = null; screen = "playlists" },
+                onChange = { error = null; playlistsFrom = "home"; screen = "playlists" },
                 onReload = {
                     val l = active
                         ?: lists.firstOrNull { it.id == prefs.getString("last", null) }
