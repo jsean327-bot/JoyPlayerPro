@@ -31,7 +31,15 @@ import kotlinx.coroutines.withContext
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { MaterialTheme(colorScheme = JoyColors) { Surface(Modifier.fillMaxSize()) { JoyApp() } } }
+        setContent {
+            MaterialTheme(colorScheme = JoyColors) {
+                androidx.compose.runtime.CompositionLocalProvider(
+                    androidx.compose.foundation.LocalIndication provides TvIndication
+                ) {
+                    Surface(Modifier.fillMaxSize()) { JoyApp() }
+                }
+            }
+        }
     }
 
     override fun onUserLeaveHint() {
