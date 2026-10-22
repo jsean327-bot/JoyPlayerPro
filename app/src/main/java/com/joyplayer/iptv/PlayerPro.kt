@@ -43,6 +43,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
@@ -179,6 +180,30 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     var hits by remember { mutableStateOf<List<SubHit>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
+    // downloaded subtitle kept in memory so its timing can be shifted (Subtitle delay)
+    var subText by remember(ch.url) { mutableStateOf<String?>(null) }
+    var subExt by remember(ch.url) { mutableStateOf("srt") }
+    var subLabel by remember(ch.url) { mutableStateOf("") }
+    var subOffset by remember(ch.url) { mutableStateOf(0L) }
+    var delayPending by remember(ch.url) { mutableStateOf(0L) }
+    var speed by remember(ch.url) { mutableStateOf(1f) }
+    var sleepEnd by remember { mutableStateOf(0L) }
+    var sleepLeft by remember { mutableStateOf(0) }
+    LaunchedEffect(sleepEnd) {
+        if (sleepEnd <= 0L) {
+            sleepLeft = 0
+            return@LaunchedEffect
+        }
+        while (true) {
+            val left = sleepEnd - System.currentTimeMillis()
+            if (left <= 0L) break
+            sleepLeft = ((left + 59_999L) / 60_000L).toInt()
+            delay(minOf(left, 30_000L))
+        }
+        sleepEnd = 0L
+        player.pause()
+        back()
+    }
     // Picture size: 0 = Fit (black bars), 4 = Zoom (fills the screen, crops edges), 3 = Stretch
     val playerPrefs = remember { ctx.getSharedPreferences("joyplayer_player", android.content.Context.MODE_PRIVATE) }
     var resizeMode by remember { mutableStateOf(playerPrefs.getInt("resize", 0)) }
@@ -274,8 +299,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         }
     }
 
-    suspend fun applyHit(h: SubHit) {
-        val (file, ext) = withContext(Dispatchers.IO) { SubDl.fetch(h.url, meta, ctx.cacheDir) }
+    suspend fun loadSubFile(file: java.io.File, ext: String, label: String) {
         val mime = when (ext) {
             "vtt" -> MimeTypes.TEXT_VTT
             "ass", "ssa" -> MimeTypes.TEXT_SSA
@@ -284,7 +308,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         val sub = MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(file))
             .setMimeType(mime)
             .setLanguage(lang.lowercase())
-            .setLabel("SubDL")
+            .setLabel(label)
             .setSelectionFlags(C.SELECTION_FLAG_DEFAULT)
             .build()
         val pos = player.currentPosition
@@ -293,7 +317,31 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false).build()
         player.prepare()
         player.playWhenReady = true
+    }
+
+    suspend fun applyHit(h: SubHit) {
+        val (file, ext) = withContext(Dispatchers.IO) { SubDl.fetch(h.url, meta, ctx.cacheDir) }
+        subText = withContext(Dispatchers.IO) { file.readText(Charsets.UTF_8) }
+        subExt = ext
+        subLabel = h.name
+        subOffset = 0L
+        delayPending = 0L
+        loadSubFile(file, ext, "SubDL")
         msg = "Subtitle loaded: ${h.name}"
+    }
+
+    fun applyDelay(off: Long) {
+        val txt = subText ?: return
+        val ext = subExt
+        scope.launch {
+            val f = withContext(Dispatchers.IO) {
+                val out = java.io.File(ctx.cacheDir, "sub_shift_${System.currentTimeMillis()}.$ext")
+                out.writeText(SubShift.shift(txt, ext, off), Charsets.UTF_8)
+                out
+            }
+            loadSubFile(f, ext, "SubDL")
+            subOffset = off
+        }
     }
 
     fun search(applyFirst: Boolean) {
@@ -554,6 +602,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 OverlayBtn("🔊 Audio", Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
+                if (hasMeta) OverlayBtn("⏩ " + (if (speed == 1f) "1x" else "${speed}x")) { dialog = "speed" }
+                OverlayBtn(if (sleepEnd > 0L) "😴 ${sleepLeft}m" else "😴 Sleep") { dialog = "sleep" }
                 OverlayBtn(
                     when (resizeMode) { 4 -> "⤢ Zoom"; 3 -> "⤢ Stretch"; else -> "⤢ Fit" }
                 ) {
@@ -596,12 +646,58 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     }
                 }
                 if (hasMeta) {
+                    Opt("⏱  Subtitle delay", false) { delayPending = subOffset; dialog = "subdelay" }
                     Opt("🌐  Search online (SubDL)", false) {
                         dialog = "online"
                         if (key.isNotBlank()) search(false)
                     }
                 } else {
                     Text("Online search works for movies and series.", color = C.Text, fontSize = 13.sp)
+                }
+            }
+            "subdelay" -> PlayerDialog("Subtitle delay", { dialog = "" }) {
+                if (subText == null) {
+                    Text(
+                        "Delay works with subtitles downloaded from SubDL. Load one first.",
+                        color = C.Text, fontSize = 13.sp
+                    )
+                } else {
+                    Text(
+                        String.format(Locale.US, "%+.1fs", delayPending / 1000.0),
+                        color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold
+                    )
+                    Text("Positive values show the subtitle later, negative earlier.", color = C.Text, fontSize = 12.sp)
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OverlayBtn("-0.5s") { delayPending -= 500L }
+                        OverlayBtn("-0.1s") { delayPending -= 100L }
+                        OverlayBtn("+0.1s") { delayPending += 100L }
+                        OverlayBtn("+0.5s") { delayPending += 500L }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = { delayPending = 0L }) { Text("Reset") }
+                        Button(
+                            onClick = { applyDelay(delayPending); dialog = "" },
+                            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
+                        ) { Text("OK") }
+                    }
+                }
+            }
+            "speed" -> PlayerDialog("Playback speed", { dialog = "" }) {
+                listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f).forEach { sp ->
+                    Opt(if (sp == 1f) "Normal (1x)" else "${sp}x", speed == sp) {
+                        speed = sp
+                        player.setPlaybackParameters(PlaybackParameters(sp))
+                        dialog = ""
+                    }
+                }
+            }
+            "sleep" -> PlayerDialog("Sleep timer", { dialog = "" }) {
+                Opt("Off", sleepEnd == 0L) { sleepEnd = 0L; dialog = "" }
+                listOf(15, 30, 45, 60, 90, 120).forEach { m ->
+                    Opt("$m min", false) {
+                        sleepEnd = System.currentTimeMillis() + m * 60_000L
+                        dialog = ""
+                    }
                 }
             }
             "online" -> PlayerDialog("SubDL subtitles", { dialog = "" }) {
