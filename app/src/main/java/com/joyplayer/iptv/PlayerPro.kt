@@ -131,8 +131,23 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     }
     val baseItem = remember(ch.url) { MediaItem.fromUri(AppPrefs.fmtUrl(ch.url)) }
     val shared = remember(ch.url) { SharedLive.takeFor(ch.url) }
+    ResumeStore.init(ctx)
+    val resumeAt = remember(ch.url) { if (hasMeta && shared == null) ResumeStore.get(ch.url) else 0L }
     val player = shared ?: remember(ch.url) {
-        ExoPlayer.Builder(ctx).build().apply { setMediaItem(baseItem); prepare(); playWhenReady = true }
+        ExoPlayer.Builder(ctx).build().apply {
+            setMediaItem(baseItem, resumeAt.coerceAtLeast(0L)); prepare(); playWhenReady = true
+        }
+    }
+    LaunchedEffect(ch.url) {
+        if (resumeAt > 0L) {
+            android.widget.Toast.makeText(ctx, "Resuming from ${ResumeStore.fmt(resumeAt)}", android.widget.Toast.LENGTH_SHORT).show()
+        }
+    }
+    LaunchedEffect(player) {
+        while (true) {
+            delay(5000)
+            if (hasMeta && shared == null && player.isPlaying) ResumeStore.save(ch.url, player.currentPosition, player.duration)
+        }
     }
     PipSupport(player)
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
@@ -160,6 +175,18 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     DisposableEffect(player) {
         val l = object : Player.Listener {
             override fun onTracksChanged(t: Tracks) { tracks = t }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED && hasMeta && shared == null) {
+                    val nx = PlayQueue.nextAfter(ch.url)
+                    val go = PlayQueue.play
+                    if (nx != null && go != null) {
+                        ResumeStore.save(ch.url, player.duration, player.duration)
+                        PlayMeta.map[nx.first.url] = nx.second
+                        android.widget.Toast.makeText(ctx, "Next episode: ${nx.first.name}", android.widget.Toast.LENGTH_SHORT).show()
+                        go(nx.first)
+                    }
+                }
+            }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 android.widget.Toast.makeText(
                     ctx, "Playback error: ${error.errorCodeName}", android.widget.Toast.LENGTH_LONG
@@ -169,6 +196,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         player.addListener(l)
         onDispose {
             player.removeListener(l)
+            if (hasMeta && shared == null) ResumeStore.save(ch.url, player.currentPosition, player.duration)
             if (shared == null) player.release() else SharedLive.restorePreview()
         }
     }
@@ -294,6 +322,12 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
                 OverlayBtn("🖼 PiP") { PipState.request(ctx) }
+                PlayQueue.nextAfter(ch.url)?.let { nx ->
+                    if (hasMeta) OverlayBtn("⏭ Next") {
+                        PlayMeta.map[nx.first.url] = nx.second
+                        PlayQueue.play?.invoke(nx.first)
+                    }
+                }
             }
         }
 
