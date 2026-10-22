@@ -17,7 +17,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusable
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyEvent
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -73,10 +83,10 @@ private fun selectTrack(player: ExoPlayer, g: Tracks.Group, i: Int) {
 }
 
 @Composable
-private fun OverlayBtn(label: String, onClick: () -> Unit) {
+private fun OverlayBtn(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Text(
         label, color = Color.White, fontSize = 14.sp,
-        modifier = Modifier.clip(RoundedCornerShape(18.dp)).background(Color(0x99000000))
+        modifier = modifier.clip(RoundedCornerShape(18.dp)).background(Color(0x99000000))
             .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp)
     )
 }
@@ -135,6 +145,18 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     var hits by remember { mutableStateOf<List<SubHit>>(emptyList()) }
     var busy by remember { mutableStateOf(false) }
     var msg by remember { mutableStateOf<String?>(null) }
+    val boxFr = remember { FocusRequester() }
+    val firstBtnFr = remember { FocusRequester() }
+    var boxFocused by remember { mutableStateOf(false) }
+    var pv by remember { mutableStateOf<PlayerView?>(null) }
+
+    // Remote control: keep focus on the video so OK / left / right work, return to it after dialogs.
+    LaunchedEffect(dialog, overlay) {
+        if (dialog.isEmpty() && (overlay || !boxFocused)) {
+            delay(80)
+            runCatching { if (!overlay || !boxFocused) boxFr.requestFocus() }
+        }
+    }
 
     DisposableEffect(player) {
         val l = object : Player.Listener {
@@ -203,11 +225,44 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        Modifier.fillMaxSize().background(Color.Black)
+            .focusRequester(boxFr)
+            .onFocusChanged { boxFocused = it.isFocused }
+            .onPreviewKeyEvent { e ->
+                if (!boxFocused || dialog.isNotEmpty() || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                val repeat = e.nativeKeyEvent.repeatCount
+                val step = if (repeat > 6) 30_000L else 10_000L
+                when (e.key) {
+                    Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.MediaPlayPause -> {
+                        if (player.isPlaying) player.pause() else player.play()
+                        pv?.showController(); true
+                    }
+                    Key.MediaPlay -> { player.play(); pv?.showController(); true }
+                    Key.MediaPause -> { player.pause(); pv?.showController(); true }
+                    Key.DirectionLeft, Key.MediaRewind -> {
+                        if (player.isCurrentMediaItemSeekable) player.seekTo((player.currentPosition - step).coerceAtLeast(0L))
+                        pv?.showController(); true
+                    }
+                    Key.DirectionRight, Key.MediaFastForward -> {
+                        if (player.isCurrentMediaItemSeekable) player.seekTo(player.currentPosition + step)
+                        pv?.showController(); true
+                    }
+                    Key.DirectionUp, Key.Menu -> {
+                        if (overlay) runCatching { firstBtnFr.requestFocus() } else pv?.showController()
+                        true
+                    }
+                    Key.DirectionDown -> { pv?.showController(); true }
+                    else -> false
+                }
+            }
+            .focusable()
+    ) {
         AndroidView(
             factory = { c ->
                 (android.view.LayoutInflater.from(c).inflate(R.layout.player_view, null) as PlayerView).apply {
                     this.player = player
+                    pv = this
                     AppPrefs.styleSubtitles(this)
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
@@ -228,10 +283,15 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         )
         if ((overlay || dialog.isNotEmpty()) && !PipState.inPip) {
             Row(
-                Modifier.align(Alignment.TopEnd).padding(12.dp),
+                Modifier.align(Alignment.TopEnd).padding(12.dp)
+                    .onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
+                            runCatching { boxFr.requestFocus() }; true
+                        } else false
+                    },
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                OverlayBtn("🔊 Audio") { dialog = "audio" }
+                OverlayBtn("🔊 Audio", Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
                 OverlayBtn("🖼 PiP") { PipState.request(ctx) }
