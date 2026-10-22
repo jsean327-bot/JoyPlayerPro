@@ -154,6 +154,9 @@ object AppPrefs {
 
 object Parental {
     var unlocked by mutableStateOf(false)
+
+    /** Categories opened with the PIN during this visit ("kind|listId|category"). */
+    val opened = mutableStateListOf<String>()
 }
 
 object LiveHistory {
