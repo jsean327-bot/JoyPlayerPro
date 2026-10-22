@@ -34,6 +34,33 @@ fun PinField(value: String, label: String, onChange: (String) -> Unit) {
     )
 }
 
+/** Asks for the parental PIN before opening a locked category. */
+@Composable
+fun PinGate(onOk: () -> Unit, onDismiss: () -> Unit) {
+    var pin by remember { mutableStateOf("") }
+    var err by remember { mutableStateOf<String?>(null) }
+    SDialog("Enter PIN", onDismiss) {
+        PinField(pin, "PIN") {
+            pin = it
+            err = null
+            if (it.length == 4 && AppPrefs.checkPin(it)) onOk()
+        }
+        err?.let { Text(it, color = Color(0xFFFF8A8A), fontSize = 13.sp) }
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(
+                onClick = { if (AppPrefs.checkPin(pin)) onOk() else err = "Wrong PIN" },
+                colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+                modifier = Modifier.weight(1f)
+            ) { Text("OK") }
+            Button(
+                onClick = onDismiss,
+                colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark),
+                modifier = Modifier.weight(1f)
+            ) { Text("Cancel") }
+        }
+    }
+}
+
 @Composable
 fun CategoryPicker(
     title: String, categories: List<String>, initial: Set<String>,
@@ -112,6 +139,7 @@ fun CategoryPickerLoader(
             if (locked) AppPrefs.locked(kind, id) else AppPrefs.hidden(kind, id),
             { s ->
                 if (locked) AppPrefs.setLocked(kind, id, s) else AppPrefs.setHidden(kind, id, s)
+                Parental.opened.clear()
                 onDismiss()
             },
             onDismiss
