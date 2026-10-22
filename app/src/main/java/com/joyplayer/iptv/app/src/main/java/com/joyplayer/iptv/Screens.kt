@@ -277,15 +277,23 @@ fun CatRow(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
 
 @Composable
 fun LiveScreen(
-    all: List<Channel>, favs: Set<String>, paused: Boolean,
-    onFav: (Channel) -> Unit, onNav: (String) -> Unit, onFull: (Channel) -> Unit
+    allIn: List<Channel>, favs: Set<String>, paused: Boolean,
+    onFav: (Channel) -> Unit, onNav: (String) -> Unit, onFull: (Channel) -> Unit,
+    locked: Set<String> = emptySet(), lockScope: String = ""
 ) {
     val ctx = LocalContext.current
+    val openedNow = Parental.opened.toList()
+    val closed = remember(locked, lockScope, openedNow) {
+        locked.filter { "live|$lockScope|$it" !in openedNow }.toSet()
+    }
+    val all = remember(allIn, closed) { if (closed.isEmpty()) allIn else allIn.filter { it.group !in closed } }
+    var pinFor by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(Unit) { onDispose { Parental.opened.removeAll { it.startsWith("live|") } } }
     var cat by rememberSaveable { mutableStateOf("*all*") }
     var query by rememberSaveable { mutableStateOf("") }
     var selUrl by rememberSaveable { mutableStateOf<String?>(null) }
     val histVersion = LiveHistory.version
-    val groups = remember(all) { all.groupBy { it.group }.map { it.key to it.value.size } }
+    val groups = remember(allIn) { allIn.groupBy { it.group }.map { it.key to it.value.size } }
     val favCount = remember(all, favs) { all.count { it.url in favs } }
     val recentCount = remember(all, histVersion) {
         val urls = all.asSequence().map { it.url }.toHashSet()
@@ -315,6 +323,8 @@ fun LiveScreen(
     val sel = remember(all, selUrl) { all.firstOrNull { it.url == selUrl } }
     val player = rememberLivePlayer(sel, paused)
     val compact = rememberIsCompact()
+    LaunchedEffect(closed) { if (cat in closed) cat = "*all*" }
+    val pickCat: (String) -> Unit = { c -> if (c in closed) pinFor = c else cat = c }
     val onRowClick: (Channel) -> Unit = { ch ->
         if (ch.url == selUrl) onFull(ch) else { selUrl = ch.url; LiveHistory.push(ch.url) }
     }
@@ -325,12 +335,12 @@ fun LiveScreen(
     }
 
     if (compact) {
-        val catOptions = remember(groups, all.size, favCount, recentCount) {
+        val catOptions = remember(groups, all.size, favCount, recentCount, closed) {
             listOf(
                 CatOpt("*all*", "All", all.size),
                 CatOpt("*fav*", "Favorite", favCount),
                 CatOpt("*rec*", "Recently watched", recentCount)
-            ) + groups.map { CatOpt(it.first, it.first, it.second) }
+            ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + it.first, it.second) }
         }
         Column(Modifier.fillMaxSize().background(C.Bg)) {
             Row(
@@ -349,7 +359,7 @@ fun LiveScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryButton(cat, catOptions, { cat = it }, Modifier.weight(0.45f))
+                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.45f))
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search") }, modifier = Modifier.weight(0.55f)
@@ -382,7 +392,9 @@ fun LiveScreen(
                     item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
                     item { CatRow("Favorite", favCount, cat == "*fav*") { cat = "*fav*" } }
                     item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
-                    items(groups) { (g, n) -> CatRow(g, n, cat == g) { cat = g } }
+                    items(groups) { (g, n) ->
+                        CatRow((if (g in closed) "🔒 " else "") + g, n, cat == g) { pickCat(g) }
+                    }
                 }
                 LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
                     itemsIndexed(shown) { i, ch ->
@@ -392,6 +404,12 @@ fun LiveScreen(
                 LivePane(player, sel, favs, onFav, onFull, false, Modifier.weight(0.36f).fillMaxHeight().padding(8.dp))
             }
         }
+    }
+    pinFor?.let { c ->
+        PinGate(
+            onOk = { Parental.opened.add("live|$lockScope|$c"); cat = c; pinFor = null },
+            onDismiss = { pinFor = null }
+        )
     }
 }
 
