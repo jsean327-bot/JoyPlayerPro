@@ -179,7 +179,8 @@ fun SideBtn(label: String, modifier: Modifier, onClick: () -> Unit) {
 @Composable
 fun HomeScreen(
     listName: String, loading: Boolean, error: String?,
-    onNav: (String) -> Unit, onSoon: () -> Unit, onChange: () -> Unit, onReload: () -> Unit, onExit: () -> Unit
+    onNav: (String) -> Unit, onSoon: () -> Unit, onChange: () -> Unit, onReload: () -> Unit, onExit: () -> Unit,
+    onPlay: (Channel) -> Unit = {}
 ) {
     val compact = rememberIsCompact()
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0E1A4A), C.Bg)))) {
@@ -196,6 +197,7 @@ fun HomeScreen(
             ) {
                 Text("JoyPlayer", fontSize = 34.sp, color = C.Blue, fontWeight = FontWeight.Bold)
                 Text("IPTV PRO", fontSize = 12.sp, color = C.Burgundy, fontWeight = FontWeight.Bold)
+                ContinueRow(onPlay, Modifier.fillMaxWidth())
                 Tile("Live", "📺", Modifier.fillMaxWidth().height(120.dp)) { onNav("live") }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("Movies", "🎬", Modifier.weight(1f).height(100.dp)) { onNav("movies") }
@@ -235,6 +237,10 @@ fun HomeScreen(
                     SideBtn("⟳  Reload", Modifier.weight(1f).fillMaxWidth(), onReload)
                     SideBtn("⏻  Exit", Modifier.weight(1f).fillMaxWidth(), onExit)
                 }
+            }
+            if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 480) {
+                Spacer(Modifier.height(16.dp))
+                ContinueRow(onPlay, Modifier.fillMaxWidth())
             }
         }
         error?.let {
@@ -311,6 +317,11 @@ fun LiveScreen(
     val compact = rememberIsCompact()
     val onRowClick: (Channel) -> Unit = { ch ->
         if (ch.url == selUrl) onFull(ch) else { selUrl = ch.url; LiveHistory.push(ch.url) }
+    }
+    SideEffect {
+        LiveZap.list = shown
+        LiveZap.play = onFull
+        LiveZap.onSelect = { c -> selUrl = c.url; LiveHistory.push(c.url) }
     }
 
     if (compact) {
