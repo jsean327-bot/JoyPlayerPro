@@ -344,6 +344,7 @@ fun LiveScreen(
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(sel?.name ?: "", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+                EpgInfo(sel)
                 Spacer(Modifier.weight(1f))
                 if (sel != null) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
