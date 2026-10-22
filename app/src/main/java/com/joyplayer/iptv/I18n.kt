@@ -308,6 +308,7 @@ Stop casting|إيقاف البث|Arrêter la diffusion|Detener transmisión|Stre
 Casting to ~|البث إلى|Diffusion sur|Transmitiendo a|Streamt auf|Trasmissione a|Transmitindo para|Трансляция на|Yayınlanıyor:
 Cast|بث|Cast|Cast|Cast|Cast|Cast|Cast|Cast
 Stop|إيقاف|Arrêter|Detener|Stopp|Ferma|Parar|Стоп|Durdur
+Last|السابقة|Précédente|Anterior|Zurück|Precedente|Anterior|Предыдущий|Önceki
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
