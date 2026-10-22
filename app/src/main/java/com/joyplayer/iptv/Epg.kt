@@ -93,10 +93,11 @@ object Epg {
 }
 
 @Composable
-fun rememberEpg(url: String?): List<EpgItem>? =
-    produceState<List<EpgItem>?>(null, url) {
+fun rememberEpg(ch: Channel): List<EpgItem>? =
+    produceState<List<EpgItem>?>(null, ch.url, ch.tvgId) {
         value = null
-        if (url != null) value = Epg.load(url)
+        val x = Epg.load(ch.url)                       // Xtream servers
+        value = if (x.isNotEmpty()) x else XmlTv.forChannel(ch)   // plain M3U playlists with an XMLTV guide
     }.value
 
 @Composable
@@ -115,7 +116,7 @@ private fun fmtT(sec: Long): String =
 @Composable
 fun EpgInfo(ch: Channel?) {
     if (ch == null) return
-    val items = rememberEpg(ch.url)
+    val items = rememberEpg(ch)
     val now = rememberEpgNow()
     var guide by remember { mutableStateOf(false) }
     val cur = items?.firstOrNull { it.start <= now && now < it.end }
@@ -170,7 +171,7 @@ fun EpgInfo(ch: Channel?) {
 /** Small Now / Next label over the fullscreen live player. */
 @Composable
 fun EpgBadge(ch: Channel, modifier: Modifier = Modifier) {
-    val items = rememberEpg(ch.url)
+    val items = rememberEpg(ch)
     val now = rememberEpgNow()
     val cur = items?.firstOrNull { it.start <= now && now < it.end } ?: return
     val nxt = items?.firstOrNull { it.start > now }
