@@ -58,6 +58,9 @@ object AppPrefs {
     var posterSize: Int
         get() = gi("poster", 1)
         set(v) { pi("poster", v) }
+    var listLayout: Boolean
+        get() = gi("listlayout", 0) == 1
+        set(v) { pi("listlayout", if (v) 1 else 0) }
     var liveSort: Int
         get() = gi("livesort", 0)
         set(v) { pi("livesort", v) }
@@ -161,6 +164,19 @@ fun SOpt(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(label, color = Color.White, fontSize = 14.sp, modifier = Modifier.weight(1f))
         if (selected) Text("✓", color = Color.White)
+    }
+}
+
+@Composable
+fun LayoutOpt(label: String, checked: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+            .background(if (checked) C.Burgundy else C.Row)
+            .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f))
+        Checkbox(checked = checked, onCheckedChange = null)
     }
 }
 
@@ -274,10 +290,28 @@ fun SettingsScreen(
                 SOpt(Lang.names[i], Lang.code == c) { Lang.set(c); dialog = "" }
             }
         }
-        "layout" -> ChoiceDialog(
-            "Poster size (Movies & Series)", listOf("Small", "Medium", "Large"), AppPrefs.posterSize,
-            { AppPrefs.posterSize = it; dialog = "" }, { dialog = "" }
-        )
+        "layout" -> SDialog("Change Layout", { dialog = "" }) {
+            var asList by remember { mutableStateOf(AppPrefs.listLayout) }
+            var size by remember { mutableStateOf(AppPrefs.posterSize) }
+            LayoutOpt("List Layout", asList) { asList = true }
+            LayoutOpt("Grid Layout", !asList) { asList = false }
+            if (!asList) {
+                Text("Poster size (Movies & Series)", color = C.Text, fontSize = 13.sp)
+                listOf("Small", "Medium", "Large").forEachIndexed { i, n -> SOpt(n, size == i) { size = i } }
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { AppPrefs.listLayout = asList; AppPrefs.posterSize = size; dialog = "" },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+                    modifier = Modifier.weight(1f)
+                ) { Text("OK") }
+                Button(
+                    onClick = { dialog = "" },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Cancel") }
+            }
+        }
         "sort" -> ChoiceDialog(
             "Live channel sort", listOf("Default (as provided)", "A → Z", "Z → A"), AppPrefs.liveSort,
             { AppPrefs.liveSort = it; dialog = "" }, { dialog = "" }
