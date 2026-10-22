@@ -530,11 +530,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Key.ChannelUp -> { if (canZap) zap(1) else pv?.showController(); true }
                     Key.ChannelDown -> { if (canZap) zap(-1) else pv?.showController(); true }
                     Key.DirectionUp -> {
-                        if (canZap) zap(-1) else focusButtons()
+                        if (canZap) dialog = "chans" else focusButtons()
                         true
                     }
                     Key.Menu -> { focusButtons(); true }
-                    Key.DirectionDown -> { if (canZap) zap(1) else pv?.showController(); true }
+                    Key.DirectionDown -> { if (canZap) dialog = "chans" else pv?.showController(); true }
                     else -> false
                 }
             }
@@ -744,6 +744,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     OverlayBtn("⏮ CH") { zap(-1) }
                     OverlayBtn("CH ⏭") { zap(1) }
                     OverlayBtn("↩ Last") { lastChannel() }
+                    OverlayBtn("☰ Channels") { dialog = "chans" }
                 }
                 OverlayBtn("🔊 Audio", Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
@@ -838,6 +839,63 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                         speed = sp
                         player.setPlaybackParameters(PlaybackParameters(sp))
                         dialog = ""
+                    }
+                }
+            }
+            "chans" -> androidx.compose.ui.window.Dialog(
+                onDismissRequest = { dialog = "" },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+            ) {
+                val chList = LiveZap.list
+                val curIdx = chList.indexOfFirst { it.url == ch.url }.coerceAtLeast(0)
+                val ls = androidx.compose.foundation.lazy.rememberLazyListState(
+                    initialFirstVisibleItemIndex = (curIdx - 3).coerceAtLeast(0)
+                )
+                val curFr = remember { FocusRequester() }
+                LaunchedEffect(Unit) {
+                    delay(120)
+                    runCatching { curFr.requestFocus() }
+                }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
+                    Column(
+                        Modifier.fillMaxHeight().width(340.dp)
+                            .background(Color(0xE60E0B24)).padding(vertical = 12.dp)
+                    ) {
+                        Text(
+                            "Channels", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                        )
+                        androidx.compose.foundation.lazy.LazyColumn(
+                            state = ls,
+                            modifier = Modifier.fillMaxWidth().weight(1f),
+                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            items(chList.size) { i ->
+                                val c = chList[i]
+                                val isCur = i == curIdx
+                                Row(
+                                    Modifier.fillMaxWidth()
+                                        .then(if (isCur) Modifier.focusRequester(curFr) else Modifier)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(if (isCur) C.Burgundy else Color(0x33FFFFFF))
+                                        .clickable {
+                                            dialog = ""
+                                            if (!isCur) goTo(c, i + 1)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("${i + 1}", color = Color(0xFFBFB6E8), fontSize = 13.sp, modifier = Modifier.width(40.dp))
+                                    Text(
+                                        c.name, color = Color.White, fontSize = 15.sp, maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isCur) Text("▶", color = Color.White, fontSize = 13.sp)
+                                }
+                            }
+                        }
                     }
                 }
             }
