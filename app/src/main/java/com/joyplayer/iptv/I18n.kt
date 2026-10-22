@@ -49,6 +49,12 @@ object Lang {
         }
     }
 
+    /** Re-read the saved language (after a backup restore). */
+    fun reload() {
+        val saved = prefs?.getString("code", null) ?: return
+        if (saved in codes) code = saved
+    }
+
     fun set(c: String) {
         if (c !in codes) return
         code = c
@@ -276,6 +282,18 @@ Subtitle Background|خلفية الترجمة|Fond des sous-titres|Fondo de subt
 Subtitle Test|اختبار الترجمة|Test de sous-titre|Prueba de subtítulo|Untertitel-Test|Test sottotitolo|Teste de legenda|Проверка субтитров|Altyazı testi
 Get a free key from subdl.com|احصل على مفتاح مجاني من subdl.com|Obtenez une clé gratuite sur subdl.com|Obtén una clave gratis en subdl.com|Hol dir einen kostenlosen Schlüssel auf subdl.com|Ottieni una chiave gratuita su subdl.com|Obtenha uma chave grátis em subdl.com|Получите бесплатный ключ на subdl.com|subdl.com'dan ücretsiz anahtar alın
 Access Restricted|الوصول مقيّد|Accès restreint|Acceso restringido|Zugriff beschränkt|Accesso limitato|Acesso restrito|Доступ ограничен|Erişim kısıtlı
+Backup & Restore|نسخة احتياطية واستعادة|Sauvegarde et restauration|Copia de seguridad y restauración|Sicherung & Wiederherstellung|Backup e ripristino|Backup e restauração|Резервная копия и восстановление|Yedekle ve geri yükle
+The backup contains your playlists (with passwords), favorites, history and settings. Keep it private.|النسخة تحتوي قوائمك (مع كلمات المرور) والمفضلة والسجل والإعدادات. احتفظ بها بسرية.|La sauvegarde contient vos playlists (avec mots de passe), favoris, historique et réglages. Gardez-la privée.|La copia contiene tus listas (con contraseñas), favoritos, historial y ajustes. Mantenla privada.|Die Sicherung enthält deine Playlists (mit Passwörtern), Favoriten, Verlauf und Einstellungen. Halte sie privat.|Il backup contiene le tue playlist (con password), preferiti, cronologia e impostazioni. Tienilo privato.|O backup contém suas listas (com senhas), favoritos, histórico e configurações. Mantenha-o privado.|Копия содержит ваши плейлисты (с паролями), избранное, историю и настройки. Храните её в тайне.|Yedek listelerinizi (şifrelerle), favorileri, geçmişi ve ayarları içerir. Gizli tutun.
+Save backup to a file|حفظ نسخة احتياطية في ملف|Enregistrer la sauvegarde dans un fichier|Guardar copia en un archivo|Sicherung in Datei speichern|Salva backup in un file|Salvar backup em arquivo|Сохранить копию в файл|Yedeği dosyaya kaydet
+Restore from a file|استعادة من ملف|Restaurer depuis un fichier|Restaurar desde un archivo|Aus Datei wiederherstellen|Ripristina da file|Restaurar de arquivo|Восстановить из файла|Dosyadan geri yükle
+Copy backup to clipboard|نسخ النسخة الاحتياطية للحافظة|Copier la sauvegarde dans le presse-papiers|Copiar copia al portapapeles|Sicherung in Zwischenablage kopieren|Copia backup negli appunti|Copiar backup para a área de transferência|Копировать копию в буфер|Yedeği panoya kopyala
+Restore from clipboard|استعادة من الحافظة|Restaurer depuis le presse-papiers|Restaurar desde el portapapeles|Aus Zwischenablage wiederherstellen|Ripristina dagli appunti|Restaurar da área de transferência|Восстановить из буфера|Panodan geri yükle
+Backup link (https://...)|رابط النسخة (https://...)|Lien de sauvegarde (https://...)|Enlace de la copia (https://...)|Sicherungslink (https://...)|Link del backup (https://...)|Link do backup (https://...)|Ссылка на копию (https://...)|Yedek bağlantısı (https://...)
+Restore from link|استعادة من رابط|Restaurer depuis un lien|Restaurar desde enlace|Von Link wiederherstellen|Ripristina da link|Restaurar de link|Восстановить по ссылке|Bağlantıdan geri yükle
+Restore backup?|استعادة النسخة؟|Restaurer la sauvegarde ?|¿Restaurar la copia?|Sicherung wiederherstellen?|Ripristinare il backup?|Restaurar o backup?|Восстановить копию?|Yedek geri yüklensin mi?
+This replaces your playlists, favorites, history and settings with the backup.|سيتم استبدال قوائمك والمفضلة والسجل والإعدادات بما في النسخة.|Ceci remplace vos playlists, favoris, historique et réglages par la sauvegarde.|Esto reemplaza tus listas, favoritos, historial y ajustes por la copia.|Dadurch werden Playlists, Favoriten, Verlauf und Einstellungen durch die Sicherung ersetzt.|Questo sostituisce playlist, preferiti, cronologia e impostazioni con il backup.|Isso substitui suas listas, favoritos, histórico e configurações pelo backup.|Плейлисты, избранное, история и настройки будут заменены копией.|Listeleriniz, favorileriniz, geçmişiniz ve ayarlarınız yedekle değiştirilecek.
+Backup saved|تم حفظ النسخة الاحتياطية|Sauvegarde enregistrée|Copia guardada|Sicherung gespeichert|Backup salvato|Backup salvo|Копия сохранена|Yedek kaydedildi
+This is not a JoyPlayer backup|هذا ليس ملف نسخة JoyPlayer|Ce n'est pas une sauvegarde JoyPlayer|No es una copia de JoyPlayer|Das ist keine JoyPlayer-Sicherung|Non è un backup di JoyPlayer|Não é um backup do JoyPlayer|Это не копия JoyPlayer|Bu bir JoyPlayer yedeği değil
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
