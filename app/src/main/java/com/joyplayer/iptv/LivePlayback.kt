@@ -38,21 +38,14 @@ fun rememberLivePlayer(sel: Channel?, paused: Boolean): ExoPlayer {
     val player = remember { PlayerFactory.create(ctx) }
     DisposableEffect(Unit) {
         SharedLive.player = player
-        val tried = mutableSetOf<String>()
+        val retries = HashMap<String, StreamRetry>()
         val l = object : Player.Listener {
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) { retries.clear(); PlayerFactory.lastDiag = "" }
+            }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-                val cur = player.currentMediaItem?.localConfiguration?.uri?.toString()
-                val alt = cur?.let { PlayerFactory.altUrl(it) }
-                if (cur != null && alt != null && cur !in tried) {
-                    tried.add(cur); tried.add(alt)
-                    player.setMediaItem(MediaItem.fromUri(alt))
-                    player.prepare()
-                    player.playWhenReady = true
-                } else {
-                    android.widget.Toast.makeText(
-                        ctx, "Playback error: ${PlayerFactory.describe(error)}", android.widget.Toast.LENGTH_LONG
-                    ).show()
-                }
+                val cur = player.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
+                PlayerFactory.handleError(ctx, player, error, cur, retries)
             }
         }
         player.addListener(l)
