@@ -58,6 +58,10 @@ object AppPrefs {
     var posterSize: Int
         get() = gi("poster", 1)
         set(v) { pi("poster", v) }
+    /** 0 = update every time, 1 = every day, 2 = after 2 days */
+    var autoUpdate: Int
+        get() = gi("autoupdate", 1)
+        set(v) { pi("autoupdate", v) }
     var listLayout: Boolean
         get() = gi("listlayout", 0) == 1
         set(v) { pi("listlayout", if (v) 1 else 0) }
@@ -342,6 +346,10 @@ fun SettingsScreen(
         "auto" -> SDialog("Automatic", { dialog = "" }) {
             var ac by remember { mutableStateOf(AppPrefs.autoConnect) }
             var asub by remember { mutableStateOf(subs.auto) }
+            var upd by remember { mutableStateOf(AppPrefs.autoUpdate.coerceIn(0, 2)) }
+            LayoutOpt("Auto-Update Live, Movie & Series everytime", upd == 0) { upd = 0 }
+            LayoutOpt("Auto-Update Live, Movie & Series everyday", upd == 1) { upd = 1 }
+            LayoutOpt("Auto-Update Live, Movie & Series after 2 days", upd == 2) { upd = 2 }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(ac, { ac = it; AppPrefs.autoConnect = it })
                 Text("  Auto-connect to the last playlist on launch", color = Color.White, fontSize = 14.sp)
@@ -349,6 +357,18 @@ fun SettingsScreen(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Switch(asub, { asub = it; subs.auto = it })
                 Text("  Auto-load subtitles (movies & series)", color = Color.White, fontSize = 14.sp)
+            }
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { AppPrefs.autoUpdate = upd; dialog = "" },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+                    modifier = Modifier.weight(1f)
+                ) { Text("OK") }
+                Button(
+                    onClick = { dialog = "" },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark),
+                    modifier = Modifier.weight(1f)
+                ) { Text("Cancel") }
             }
         }
         "sub" -> SDialog("Subtitle Settings", { dialog = "" }) {
