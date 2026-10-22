@@ -8,7 +8,10 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -178,12 +181,37 @@ fun HomeScreen(
     listName: String, loading: Boolean, error: String?,
     onNav: (String) -> Unit, onSoon: () -> Unit, onChange: () -> Unit, onReload: () -> Unit, onExit: () -> Unit
 ) {
+    val compact = rememberIsCompact()
     Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0E1A4A), C.Bg)))) {
         Column(Modifier.align(Alignment.TopEnd).padding(16.dp), horizontalAlignment = Alignment.End) {
             Text(if (loading) "Loading..." else listName, color = C.Text)
             ClockText()
         }
-        Column(
+        if (compact) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(rememberScrollState())
+                    .padding(start = 16.dp, end = 16.dp, top = 64.dp, bottom = 16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text("JoyPlayer", fontSize = 34.sp, color = C.Blue, fontWeight = FontWeight.Bold)
+                Text("IPTV PRO", fontSize = 12.sp, color = C.Burgundy, fontWeight = FontWeight.Bold)
+                Tile("Live", "📺", Modifier.fillMaxWidth().height(120.dp)) { onNav("live") }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Tile("Movies", "🎬", Modifier.weight(1f).height(100.dp)) { onNav("movies") }
+                    Tile("Series", "🎞️", Modifier.weight(1f).height(100.dp)) { onNav("series") }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Tile("Account", "👤", Modifier.weight(1f).height(100.dp), onSoon)
+                    Tile("Change Playlist", "🔁", Modifier.weight(1f).height(100.dp), onChange)
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    SideBtn("⚙  Settings", Modifier.weight(1f).height(56.dp)) { onNav("settings") }
+                    SideBtn("⟳  Reload", Modifier.weight(1f).height(56.dp), onReload)
+                }
+                SideBtn("⏻  Exit", Modifier.fillMaxWidth().height(56.dp), onExit)
+            }
+        } else Column(
             Modifier.align(Alignment.Center).fillMaxWidth(0.88f),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -280,83 +308,159 @@ fun LiveScreen(
     }
     val sel = remember(all, selUrl) { all.firstOrNull { it.url == selUrl } }
     val player = rememberLivePlayer(sel, paused)
-    Column(Modifier.fillMaxSize().background(C.Bg)) {
-        Row(
-            Modifier.fillMaxWidth().background(Color(0xFF0B1330)).padding(horizontal = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            NavItem("Home", false) { onNav("home") }
-            NavItem("Live", true) {}
-            NavItem("Movies", false) { onNav("movies") }
-            NavItem("Series", false) { onNav("series") }
-            Spacer(Modifier.weight(1f))
-            OutlinedTextField(
-                query, { query = it }, singleLine = true,
-                placeholder = { Text("Search") }, modifier = Modifier.width(240.dp)
-            )
+    val compact = rememberIsCompact()
+    val onRowClick: (Channel) -> Unit = { ch ->
+        if (ch.url == selUrl) onFull(ch) else { selUrl = ch.url; LiveHistory.push(ch.url) }
+    }
+
+    if (compact) {
+        val catOptions = remember(groups, all.size, favCount, recentCount) {
+            listOf(
+                CatOpt("*all*", "All", all.size),
+                CatOpt("*fav*", "Favorite", favCount),
+                CatOpt("*rec*", "Recently watched", recentCount)
+            ) + groups.map { CatOpt(it.first, it.first, it.second) }
         }
-        Row(Modifier.fillMaxSize()) {
-            LazyColumn(Modifier.weight(0.27f).fillMaxHeight().background(C.Panel)) {
-                item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
-                item { CatRow("Favorite", favCount, cat == "*fav*") { cat = "*fav*" } }
-                item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
-                items(groups) { (g, n) -> CatRow(g, n, cat == g) { cat = g } }
+        Column(Modifier.fillMaxSize().background(C.Bg)) {
+            Row(
+                Modifier.fillMaxWidth().background(Color(0xFF0B1330))
+                    .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavItem("Home", false) { onNav("home") }
+                NavItem("Live", true) {}
+                NavItem("Movies", false) { onNav("movies") }
+                NavItem("Series", false) { onNav("series") }
             }
-            LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
+            LivePane(player, sel, favs, onFav, onFull, true, Modifier.fillMaxWidth().padding(8.dp))
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                CategoryButton(cat, catOptions, { cat = it }, Modifier.weight(0.45f))
+                OutlinedTextField(
+                    query, { query = it }, singleLine = true,
+                    placeholder = { Text("Search") }, modifier = Modifier.weight(0.55f)
+                )
+            }
+            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                 itemsIndexed(shown) { i, ch ->
-                    val isSel = ch.url == selUrl
-                    Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 1.dp)
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(if (isSel) C.Blue else C.Row)
-                            .clickable {
-                                if (isSel) onFull(ch) else { selUrl = ch.url; LiveHistory.push(ch.url) }
-                            }
-                            .padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("${i + 1}", color = C.Text.copy(alpha = 0.6f), fontSize = 12.sp, modifier = Modifier.width(36.dp))
-                        AsyncImage(ch.logo, null, Modifier.size(28.dp))
-                        Spacer(Modifier.width(8.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                ch.name, color = Color.White, maxLines = 1,
-                                overflow = TextOverflow.Ellipsis, fontSize = 14.sp
-                            )
-                            if (query.isNotBlank()) {
-                                Text(
-                                    ch.group, color = C.Text.copy(alpha = 0.7f), maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis, fontSize = 11.sp
-                                )
-                            }
-                        }
-                        if (ch.url in favs) Text("★", color = Color(0xFFFFD54F))
-                    }
+                    LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs) { onRowClick(ch) }
                 }
             }
-            Column(Modifier.weight(0.36f).fillMaxHeight().padding(8.dp)) {
-                Box(
-                    Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
-                    contentAlignment = Alignment.Center
-                ) {
-                    LivePreviewSurface(player, sel, onFull)
-                    if (sel == null) Text("Select a channel", color = C.Text)
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(sel?.name ?: "", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2)
-                EpgInfo(sel)
+        }
+    } else {
+        Column(Modifier.fillMaxSize().background(C.Bg)) {
+            Row(
+                Modifier.fillMaxWidth().background(Color(0xFF0B1330)).padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                NavItem("Home", false) { onNav("home") }
+                NavItem("Live", true) {}
+                NavItem("Movies", false) { onNav("movies") }
+                NavItem("Series", false) { onNav("series") }
                 Spacer(Modifier.weight(1f))
-                if (sel != null) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(
-                            onClick = { onFav(sel) },
-                            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
-                        ) { Text(if (sel.url in favs) "Remove Favorite" else "Add to Favorite", fontSize = 12.sp) }
-                        Button(
-                            onClick = { onFull(sel) },
-                            colors = ButtonDefaults.buttonColors(containerColor = C.Blue)
-                        ) { Text("Fullscreen", fontSize = 12.sp) }
+                OutlinedTextField(
+                    query, { query = it }, singleLine = true,
+                    placeholder = { Text("Search") }, modifier = Modifier.width(240.dp)
+                )
+            }
+            Row(Modifier.fillMaxSize()) {
+                LazyColumn(Modifier.weight(0.27f).fillMaxHeight().background(C.Panel)) {
+                    item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
+                    item { CatRow("Favorite", favCount, cat == "*fav*") { cat = "*fav*" } }
+                    item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
+                    items(groups) { (g, n) -> CatRow(g, n, cat == g) { cat = g } }
+                }
+                LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
+                    itemsIndexed(shown) { i, ch ->
+                        LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs) { onRowClick(ch) }
                     }
+                }
+                LivePane(player, sel, favs, onFav, onFull, false, Modifier.weight(0.36f).fillMaxHeight().padding(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LiveRow(i: Int, ch: Channel, isSel: Boolean, showGroup: Boolean, fav: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 1.dp)
+            .clip(RoundedCornerShape(6.dp))
+            .background(if (isSel) C.Blue else C.Row)
+            .clickable(onClick = onClick)
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("${i + 1}", color = C.Text.copy(alpha = 0.6f), fontSize = 12.sp, modifier = Modifier.width(36.dp))
+        AsyncImage(ch.logo, null, Modifier.size(28.dp))
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                ch.name, color = Color.White, maxLines = 1,
+                overflow = TextOverflow.Ellipsis, fontSize = 14.sp
+            )
+            if (showGroup) {
+                Text(
+                    ch.group, color = C.Text.copy(alpha = 0.7f), maxLines = 1,
+                    overflow = TextOverflow.Ellipsis, fontSize = 11.sp
+                )
+            }
+        }
+        if (fav) Text("★", color = Color(0xFFFFD54F))
+    }
+}
+
+@Composable
+private fun LivePane(
+    player: ExoPlayer, sel: Channel?, favs: Set<String>,
+    onFav: (Channel) -> Unit, onFull: (Channel) -> Unit, compact: Boolean, modifier: Modifier
+) {
+    Column(modifier) {
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
+            contentAlignment = Alignment.Center
+        ) {
+            LivePreviewSurface(player, sel, onFull)
+            if (sel == null) Text("Select a channel", color = C.Text)
+        }
+        Spacer(Modifier.height(8.dp))
+        if (compact) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    sel?.name ?: "", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
+                )
+                if (sel != null) {
+                    Button(
+                        onClick = { onFav(sel) },
+                        colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) { Text(if (sel.url in favs) "★" else "☆", fontSize = 16.sp) }
+                    Button(
+                        onClick = { onFull(sel) },
+                        colors = ButtonDefaults.buttonColors(containerColor = C.Blue),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) { Text("⛶", fontSize = 16.sp) }
+                }
+            }
+            EpgInfo(sel)
+        } else {
+            Text(sel?.name ?: "", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+            EpgInfo(sel)
+            Spacer(Modifier.weight(1f))
+            if (sel != null) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(
+                        onClick = { onFav(sel) },
+                        colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
+                    ) { Text(if (sel.url in favs) "Remove Favorite" else "Add to Favorite", fontSize = 12.sp) }
+                    Button(
+                        onClick = { onFull(sel) },
+                        colors = ButtonDefaults.buttonColors(containerColor = C.Blue)
+                    ) { Text("Fullscreen", fontSize = 12.sp) }
                 }
             }
         }
