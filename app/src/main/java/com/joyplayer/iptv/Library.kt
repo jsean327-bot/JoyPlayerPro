@@ -70,23 +70,34 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             return@LaunchedEffect
         }
         loading = true; error = null
-        try {            val hid = AppPrefs.hidden(kind, list.id)
-            val lock = if (Parental.unlocked) emptySet() else AppPrefs.locked(kind, list.id)
+        try {
+            val hid = AppPrefs.hidden(kind, list.id)
             all = withContext(Dispatchers.IO) { Vod.load(list, isSeries) }
-                .filter { it.cat !in hid && it.cat !in lock }
+                .filter { it.cat !in hid }
         } catch (e: Exception) {
             error = e.message ?: "Error"
         }
         loading = false
     }
 
+    val lockedCats = if (Parental.unlocked) emptySet() else AppPrefs.locked(kind, list?.id)
+    val openedNow = Parental.opened.toList()
+    val closed = remember(lockedCats, key, openedNow) {
+        lockedCats.filter { "$kind|${list?.id}|$it" !in openedNow }.toSet()
+    }
+    val vis = remember(all, closed) { if (closed.isEmpty()) all else all.filter { it.cat !in closed } }
+    var pinFor by remember { mutableStateOf<String?>(null) }
+    DisposableEffect(kind) { onDispose { Parental.opened.removeAll { it.startsWith("$kind|") } } }
+    LaunchedEffect(closed) { if (cat in closed) cat = "*all*" }
+    val pickCat: (String) -> Unit = { c -> if (c in closed) pinFor = c else cat = c }
+
     val groups = remember(all) { all.groupBy { it.cat }.map { it.key to it.value.size } }
-    val shown = remember(all, favs, recents, cat, query, order) {
+    val shown = remember(vis, favs, recents, cat, query, order) {
         val base = when (if (query.isBlank()) cat else "*all*") {
-            "*all*" -> all
-            "*fav*" -> all.filter { it.id.toString() in favs }
-            "*rec*" -> recents.mapNotNull { r -> all.firstOrNull { it.id.toString() == r } }
-            else -> all.filter { it.cat == cat }
+            "*all*" -> vis
+            "*fav*" -> vis.filter { it.id.toString() in favs }
+            "*rec*" -> recents.mapNotNull { r -> vis.firstOrNull { it.id.toString() == r } }
+            else -> vis.filter { it.cat == cat }
         }.filter { query.isBlank() || it.name.contains(query, true) }
         when (order) {
             1 -> base.sortedByDescending { it.added }
@@ -116,12 +127,12 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     }
 
     val compact = rememberIsCompact()
-    val catOptions = remember(groups, all.size, favs.size, recents.size) {
+    val catOptions = remember(groups, vis.size, favs.size, recents.size, closed) {
         listOf(
             CatOpt("*rec*", "Resume to Watch", recents.size),
-            CatOpt("*all*", "All", all.size),
+            CatOpt("*all*", "All", vis.size),
             CatOpt("*fav*", "Favorite", favs.size)
-        ) + groups.map { CatOpt(it.first, it.first, it.second) }
+        ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + it.first, it.second) }
     }
 
     val sortRow: @Composable () -> Unit = {
@@ -187,7 +198,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryButton(cat, catOptions, { cat = it }, Modifier.weight(0.42f))
+                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.42f))
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search...") }, modifier = Modifier.weight(0.58f)
@@ -225,9 +236,11 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                     )
                     LazyColumn {
                         item { CatRow("Resume to Watch", recents.size, cat == "*rec*") { cat = "*rec*" } }
-                        item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
+                        item { CatRow("All", vis.size, cat == "*all*") { cat = "*all*" } }
                         item { CatRow("Favorite", favs.size, cat == "*fav*") { cat = "*fav*" } }
-                        items(groups) { (g, n) -> CatRow(g, n, cat == g) { cat = g } }
+                        items(groups) { (g, n) ->
+                            CatRow((if (g in closed) "🔒 " else "") + g, n, cat == g) { pickCat(g) }
+                        }
                     }
                 }
                 Column(Modifier.weight(0.76f).fillMaxHeight()) {
@@ -236,6 +249,12 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 }
             }
         }
+    }
+    pinFor?.let { c ->
+        PinGate(
+            onOk = { Parental.opened.add("$kind|${list?.id}|$c"); cat = c; pinFor = null },
+            onDismiss = { pinFor = null }
+        )
     }
 }
 
