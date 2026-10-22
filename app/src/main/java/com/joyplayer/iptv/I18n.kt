@@ -266,6 +266,9 @@ Allow installs from JoyPlayer, come back here and press Install.|اسمح بال
 
 private val T_SETTINGS = """
 Default|افتراضي|Par défaut|Predeterminado|Standard|Predefinito|Padrão|По умолчанию|Varsayılan
+Auto-Update Live, Movie & Series everytime|تحديث المباشر والأفلام والمسلسلات في كل مرة|Mise à jour Live, films et séries à chaque fois|Actualizar En vivo, películas y series cada vez|Live, Filme & Serien jedes Mal aktualisieren|Aggiorna Live, film e serie ogni volta|Atualizar ao vivo, filmes e séries toda vez|Обновлять эфир, фильмы и сериалы каждый раз|Canlı, film ve dizileri her seferinde güncelle
+Auto-Update Live, Movie & Series everyday|تحديث المباشر والأفلام والمسلسلات كل يوم|Mise à jour Live, films et séries chaque jour|Actualizar En vivo, películas y series cada día|Live, Filme & Serien täglich aktualisieren|Aggiorna Live, film e serie ogni giorno|Atualizar ao vivo, filmes e séries todo dia|Обновлять эфир, фильмы и сериалы каждый день|Canlı, film ve dizileri her gün güncelle
+Auto-Update Live, Movie & Series after 2 days|تحديث المباشر والأفلام والمسلسلات بعد يومين|Mise à jour Live, films et séries après 2 jours|Actualizar En vivo, películas y series tras 2 días|Live, Filme & Serien nach 2 Tagen aktualisieren|Aggiorna Live, film e serie dopo 2 giorni|Atualizar ao vivo, filmes e séries após 2 dias|Обновлять эфир, фильмы и сериалы через 2 дня|Canlı, film ve dizileri 2 gün sonra güncelle
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
