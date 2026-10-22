@@ -133,3 +133,63 @@ object SubDl {
         return s.removePrefix("\uFEFF")
     }
 }
+
+/** Moves every subtitle time forward (+) or back (-) by a fixed amount (SRT, VTT and ASS/SSA text). */
+object SubShift {
+    private val ts = Regex("""(?:(\d{1,2}):)?(\d{2}):(\d{2})[.,](\d{3})""")
+    private val assTs = Regex("""(\d+):(\d{2}):(\d{2})\.(\d{2})""")
+
+    private fun fmt(ms: Long, sep: Char): String {
+        val t = if (ms < 0L) 0L else ms
+        val h = t / 3_600_000L
+        val m = (t / 60_000L) % 60L
+        val s = (t / 1000L) % 60L
+        val x = t % 1000L
+        return String.format(java.util.Locale.US, "%02d:%02d:%02d%c%03d", h, m, s, sep, x)
+    }
+
+    private fun shiftAss(field: String, off: Long): String = assTs.replace(field) { m ->
+        val ms = ((m.groupValues[1].toLong() * 60L + m.groupValues[2].toLong()) * 60L +
+                m.groupValues[3].toLong()) * 1000L + m.groupValues[4].toLong() * 10L
+        val t = (ms + off).coerceAtLeast(0L)
+        String.format(
+            java.util.Locale.US, "%d:%02d:%02d.%02d",
+            t / 3_600_000L, (t / 60_000L) % 60L, (t / 1000L) % 60L, (t % 1000L) / 10L
+        )
+    }
+
+    fun shift(text: String, ext: String, offsetMs: Long): String {
+        if (offsetMs == 0L) return text
+        val e = ext.lowercase()
+        if (e == "ass" || e == "ssa") {
+            return text.lines().joinToString("\n") { line ->
+                if (!line.startsWith("Dialogue:")) {
+                    line
+                } else {
+                    val parts = line.split(",", limit = 10)
+                    if (parts.size < 10) {
+                        line
+                    } else {
+                        val p = parts.toMutableList()
+                        p[1] = shiftAss(p[1], offsetMs)
+                        p[2] = shiftAss(p[2], offsetMs)
+                        p.joinToString(",")
+                    }
+                }
+            }
+        }
+        val sep = if (e == "vtt") '.' else ','
+        return text.lines().joinToString("\n") { line ->
+            if (!line.contains("-->")) {
+                line
+            } else {
+                ts.replace(line) { m ->
+                    val h = m.groupValues[1].ifEmpty { "0" }.toLong()
+                    val ms = ((h * 60L + m.groupValues[2].toLong()) * 60L + m.groupValues[3].toLong()) * 1000L +
+                            m.groupValues[4].toLong()
+                    fmt(ms + offsetMs, sep)
+                }
+            }
+        }
+    }
+}
