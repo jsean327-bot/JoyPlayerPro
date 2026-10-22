@@ -91,9 +91,29 @@ object Vod {
         Retrofit.Builder().baseUrl(b).addConverterFactory(GsonConverterFactory.create())
             .build().create(VodService::class.java)
 
+    fun invalidate(listId: String) {
+        cache.keys.removeAll { it.startsWith(listId + "_") }
+    }
+
     suspend fun load(l: SavedList, series: Boolean): List<LibItem> {
         val key = "${l.id}_$series"
         cache[key]?.let { return it }
+        ContentCache.vod(l, series)?.let { cache[key] = it; return it }
+        return try {
+            val items = fetchRemote(l, series)
+            cache[key] = items
+            ContentCache.putVod(l, series, items)
+            items
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val old = ContentCache.vod(l, series, ignoreAge = true) ?: throw e
+            cache[key] = old
+            old
+        }
+    }
+
+    private suspend fun fetchRemote(l: SavedList, series: Boolean): List<LibItem> {
         val b = base(l.server)
         val a = api(b)
         val cats = if (series) a.seriesCats(l.user, l.pass) else a.movieCats(l.user, l.pass)
@@ -118,7 +138,6 @@ object Vod {
                 )
             }
         }
-        cache[key] = items
         return items
     }
 
