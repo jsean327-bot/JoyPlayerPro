@@ -58,8 +58,8 @@ fun JoyApp() {
     val hiddenLive = AppPrefs.hidden("live", active?.id)
     val lockedLive = AppPrefs.locked("live", active?.id)
     val showLocked = Parental.unlocked
-    val liveChannels = remember(channels, sortMode, hiddenLive, lockedLive, showLocked) {
-        val base = channels.filter { it.group !in hiddenLive && (showLocked || it.group !in lockedLive) }
+    val liveChannels = remember(channels, sortMode, hiddenLive) {
+        val base = channels.filter { it.group !in hiddenLive }
         when (sortMode) {
             1 -> base.sortedBy { it.name.lowercase() }
             2 -> base.sortedByDescending { it.name.lowercase() }
@@ -174,7 +174,9 @@ fun JoyApp() {
                         favStore.save(favs)
                     },
                     onNav = { go(it) },
-                    onFull = { playing = it }
+                    onFull = { playing = it },
+                    locked = if (showLocked) emptySet() else lockedLive,
+                    lockScope = active?.id ?: ""
                 )
             }
             else -> HomeScreen(
