@@ -9,10 +9,12 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
-import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.datasource.HttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
 
 /**
  * Every player in the app is created here so all streams are requested like a normal IPTV
@@ -33,13 +35,19 @@ object PlayerFactory {
     /** Text describing the last failed stream (shown over the fullscreen player). */
     var lastDiag by mutableStateOf("")
 
+    // Same HTTP stack (OkHttp) the app already uses for the playlist / account calls.
+    private val okClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
+        .build()
+
     fun create(ctx: Context): ExoPlayer {
         val dataFactory = DataSource.Factory {
-            DefaultHttpDataSource.Factory()
+            OkHttpDataSource.Factory(okClient)
                 .setUserAgent(USER_AGENTS[uaIndex.coerceIn(0, USER_AGENTS.lastIndex)])
-                .setAllowCrossProtocolRedirects(true)
-                .setConnectTimeoutMs(15_000)
-                .setReadTimeoutMs(20_000)
                 .createDataSource()
         }
         return ExoPlayer.Builder(ctx)
@@ -82,6 +90,13 @@ object PlayerFactory {
         return name
     }
 
+    /** The deepest cause, e.g. "ConnectException: Connection refused", to see why a connection died. */
+    fun rootCause(e: Throwable): String {
+        var t: Throwable = e
+        while (t.cause != null && t.cause !== t) t = t.cause!!
+        return "${t.javaClass.simpleName}: ${(t.message ?: "").take(90)}"
+    }
+
     fun handleError(
         ctx: Context, player: ExoPlayer, error: PlaybackException, cur: String,
         retries: HashMap<String, StreamRetry>
@@ -106,6 +121,7 @@ class StreamRetry(cur: String) {
     private val combos: List<Pair<String, Int>>
     private val log = mutableListOf<String>()
     private var i = 0
+    private var lastCause = ""
     var exhaustedAt = 0L
         private set
     val exhausted: Boolean get() = i >= combos.size
@@ -124,13 +140,18 @@ class StreamRetry(cur: String) {
         if (exhausted) return false
         val c = combos[i]
         log += "${PlayerFactory.describe(error)}  [UA ${c.second + 1}]  ${PlayerFactory.mask(c.first)}"
+        lastCause = PlayerFactory.rootCause(error)
         i++
+        // A dead connection has nothing to do with the user agent: only try the other URL forms.
+        if (error.errorCode == 2001 || error.errorCode == 2002) {
+            while (i < combos.size && combos[i].second != c.second) i++
+        }
         val n = combos.getOrNull(i)
         if (n == null) {
             exhaustedAt = System.currentTimeMillis()
             PlayerFactory.uaIndex = combos[0].second
-            PlayerFactory.lastDiag = "The server refused this stream (${log.size} tries):\n" +
-                    log.takeLast(9).joinToString("\n")
+            PlayerFactory.lastDiag = "Could not play this stream (${log.size} tries):\n" +
+                    log.takeLast(9).joinToString("\n") + "\nCause: $lastCause"
             return false
         }
         PlayerFactory.uaIndex = n.second
