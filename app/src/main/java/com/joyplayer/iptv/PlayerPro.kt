@@ -536,10 +536,12 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Key.MediaPlay -> { player.play(); pv?.showController(); true }
                     Key.MediaPause -> { player.pause(); pv?.showController(); true }
                     Key.DirectionLeft, Key.MediaRewind -> {
+                        if (canZap && e.key == Key.DirectionLeft) { zap(-1); return@onPreviewKeyEvent true }   // live: previous channel
                         if (player.isCurrentMediaItemSeekable) player.seekTo((player.currentPosition - step).coerceAtLeast(0L))
                         pv?.showController(); true
                     }
                     Key.DirectionRight, Key.MediaFastForward -> {
+                        if (canZap && e.key == Key.DirectionRight) { zap(1); return@onPreviewKeyEvent true }   // live: next channel
                         if (player.isCurrentMediaItemSeekable) player.seekTo(player.currentPosition + step)
                         pv?.showController(); true
                     }
