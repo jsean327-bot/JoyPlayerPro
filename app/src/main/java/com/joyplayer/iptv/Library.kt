@@ -291,12 +291,13 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                         item { CatRow("Resume to Watch", recents.size, cat == "*rec*") { cat = "*rec*" } }
                         item { CatRow("All", vis.size, cat == "*all*") { cat = "*all*" } }
                         item { CatRow("Favorite", vis.count { it.id.toString() in favs || it.cat in favCatSet }, cat == "*fav*") { cat = "*fav*" } }
-                        items(groups) { (g, n) ->
+                        items(groups, key = { it.first }) { (g, n) ->
                             CatRow(
                                 (if (g in closed) "🔒 " else "") + g, n, cat == g,
                                 onLongClick = { toggleFavCat(g) },
                                 starred = if (editCats) null else g in favCatSet, onStar = { toggleFavCat(g) },
-                                checked = if (editCats) g in picked else null, onCheck = { togglePick(g) }
+                                checked = if (editCats) g in picked else null, onCheck = { togglePick(g) },
+                                onMoveKey = if (editCats && g in picked) ({ d -> moveNames(picked, d) }) else null
                             ) { if (editCats) togglePick(g) else pickCat(g) }
                         }
                     }
