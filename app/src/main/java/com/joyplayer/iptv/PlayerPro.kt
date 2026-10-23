@@ -312,7 +312,6 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         }
         LiveZap.onSelect?.invoke(n)
         android.widget.Toast.makeText(ctx, "$num. ${n.name}", android.widget.Toast.LENGTH_SHORT).show()
-        pv?.showController()
         LiveZap.play?.invoke(n)
     }
 
