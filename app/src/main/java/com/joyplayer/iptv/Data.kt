@@ -39,7 +39,7 @@ object M3uParser {
 
     fun fetch(url: String): List<Channel> {
         val req = Request.Builder().url(url).header("User-Agent", "JoyPlayer/1.0").build()
-        OkHttpClient().newCall(req).execute().use { r ->
+        Http.client.newCall(req).execute().use { r ->
             if (!r.isSuccessful) error("HTTP ${r.code}")
             return parse(r.body?.string().orEmpty())
         }
@@ -73,11 +73,17 @@ object Xtream {
         var base = server.trim()
         if (!base.startsWith("http")) base = "http://$base"
         if (!base.endsWith("/")) base += "/"
-        val api = Retrofit.Builder().baseUrl(base)
+        val api = Retrofit.Builder().baseUrl(base).client(Http.client)
             .addConverterFactory(GsonConverterFactory.create())
             .build().create(XtreamService::class.java)
-        val cats = api.categories(user, pass).associate { it.id to (it.name ?: "Other") }
-        return api.live(user, pass).mapNotNull { s ->
+        // categories and channels are asked at the same time
+        val (catList, streams) = kotlinx.coroutines.coroutineScope {
+            val c = kotlinx.coroutines.async { api.categories(user, pass) }
+            val s = kotlinx.coroutines.async { api.live(user, pass) }
+            c.await() to s.await()
+        }
+        val cats = catList.associate { it.id to (it.name ?: "Other") }
+        return streams.mapNotNull { s ->
             val id = s.streamId ?: return@mapNotNull null
             Channel(s.name ?: "Channel $id", "${base}live/$user/$pass/$id.m3u8",
                 s.icon?.ifBlank { null }, cats[s.categoryId] ?: "Other")
