@@ -12,6 +12,12 @@ object SortKey {
     private val digits = Regex("""\d+""")
     private val marks = Regex("""\p{M}+""")
 
+    /** Whole name, only lower-cased / without accents / numbers padded (used for category names). */
+    fun full(name: String): String {
+        val s = Normalizer.normalize(name.trim().lowercase(), Normalizer.Form.NFD).replace(marks, "")
+        return s.replace(digits) { it.value.padStart(8, '0') }
+    }
+
     fun of(name: String): String {
         var s = name
         repeat(3) {
@@ -28,6 +34,13 @@ object SortKey {
 /** A→Z (or Z→A) by title; the sort key of each item is computed once. */
 fun <T> List<T>.sortedByTitle(descending: Boolean, name: (T) -> String): List<T> {
     val keyed = map { SortKey.of(name(it)) to it }
+    val sorted = if (descending) keyed.sortedByDescending { it.first } else keyed.sortedBy { it.first }
+    return sorted.map { it.second }
+}
+
+/** Categories A→Z / Z→A by their whole name, so "AF | ...", "AM | ...", "AR | ...", "EU | ..." stay grouped together. */
+fun <T> List<T>.sortedByCategory(descending: Boolean, name: (T) -> String): List<T> {
+    val keyed = map { SortKey.full(name(it)) to it }
     val sorted = if (descending) keyed.sortedByDescending { it.first } else keyed.sortedBy { it.first }
     return sorted.map { it.second }
 }
