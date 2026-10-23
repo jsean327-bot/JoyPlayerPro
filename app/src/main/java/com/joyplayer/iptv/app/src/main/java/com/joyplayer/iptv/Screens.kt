@@ -21,6 +21,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +36,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -321,6 +324,17 @@ fun LiveScreen(
         }
     }
     val sel = remember(all, selUrl) { all.firstOrNull { it.url == selUrl } }
+    // coming back from fullscreen: put the remote's cursor on the channel that was playing
+    val selFocus = remember { FocusRequester() }
+    var wasPaused by remember { mutableStateOf(false) }
+    LaunchedEffect(paused) {
+        if (paused) {
+            wasPaused = true
+        } else if (wasPaused) {
+            delay(300)
+            runCatching { selFocus.requestFocus() }
+        }
+    }
     val player = rememberLivePlayer(sel, paused)
     val compact = rememberIsCompact()
     LaunchedEffect(closed) { if (cat in closed) cat = "*all*" }
@@ -368,7 +382,7 @@ fun LiveScreen(
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                 itemsIndexed(shown) { i, ch ->
-                    LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs) { onRowClick(ch) }
+                    LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null) { onRowClick(ch) }
                 }
             }
         }
@@ -399,7 +413,7 @@ fun LiveScreen(
                 }
                 LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
                     itemsIndexed(shown) { i, ch ->
-                        LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs) { onRowClick(ch) }
+                        LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null) { onRowClick(ch) }
                     }
                 }
                 LivePane(player, sel, favs, onFav, onFull, false, Modifier.weight(0.36f).fillMaxHeight().padding(8.dp))
@@ -415,9 +429,13 @@ fun LiveScreen(
 }
 
 @Composable
-private fun LiveRow(i: Int, ch: Channel, isSel: Boolean, showGroup: Boolean, fav: Boolean, onClick: () -> Unit) {
+private fun LiveRow(
+    i: Int, ch: Channel, isSel: Boolean, showGroup: Boolean, fav: Boolean,
+    focus: FocusRequester?, onClick: () -> Unit
+) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 1.dp)
+            .then(if (focus != null) Modifier.focusRequester(focus) else Modifier)
             .clip(RoundedCornerShape(6.dp))
             .background(if (isSel) C.Blue else C.Row)
             .clickable(onClick = onClick)
