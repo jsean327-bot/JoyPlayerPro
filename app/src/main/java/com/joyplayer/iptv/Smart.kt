@@ -7,10 +7,7 @@ import java.util.concurrent.TimeUnit
 
 object SmartList {
     private val attr = Regex("""([\w-]+)="([^"]*)"""")
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(120, TimeUnit.SECONDS)
-        .build()
+    private val client get() = Http.client
 
     // get.php?username=..&password=.. links are Xtream accounts in disguise
     fun normalize(l: SavedList): SavedList {
