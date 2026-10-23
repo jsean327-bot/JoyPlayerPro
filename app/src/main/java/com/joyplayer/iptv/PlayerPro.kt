@@ -530,11 +530,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Key.ChannelUp -> { if (canZap) zap(1) else pv?.showController(); true }
                     Key.ChannelDown -> { if (canZap) zap(-1) else pv?.showController(); true }
                     Key.DirectionUp -> {
-                        if (canZap) dialog = "chans" else focusButtons()
+                        if (canZap) dialog = "chans" else pv?.showController()
                         true
                     }
                     Key.Menu -> { focusButtons(); true }
-                    Key.DirectionDown -> { if (canZap) dialog = "chans" else pv?.showController(); true }
+                    Key.DirectionDown -> { if (canZap) dialog = "chans" else focusButtons(); true }
                     else -> false
                 }
             }
@@ -547,6 +547,17 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     this.player = player
                     pv = this
                     AppPrefs.styleSubtitles(this)
+                    // lift the player's own bar (time, seek bar, settings gear) so our buttons row sits right under it
+                    val lift = (48 * c.resources.displayMetrics.density).toInt()
+                    for (name in listOf("exo_bottom_bar", "exo_progress")) {
+                        val id = c.resources.getIdentifier(name, "id", c.packageName)
+                        val v = if (id != 0) findViewById<View>(id) else null
+                        val lp = v?.layoutParams as? ViewGroup.MarginLayoutParams
+                        if (v != null && lp != null) {
+                            lp.bottomMargin += lift
+                            v.layoutParams = lp
+                        }
+                    }
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                     )
@@ -730,11 +741,12 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         }
         if ((overlay || dialog.isNotEmpty()) && !PipState.inPip) {
             Row(
-                Modifier.align(Alignment.TopEnd).padding(12.dp)
+                // bottom of the screen, directly under the player's own bar with the settings gear
+                Modifier.align(Alignment.BottomEnd).padding(start = 12.dp, end = 12.dp, bottom = 6.dp)
                     .horizontalScroll(rememberScrollState())
                     .onPreviewKeyEvent { e ->
                         if (e.type == KeyEventType.KeyDown) uiTick++
-                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionDown) {
+                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp) {
                             runCatching { boxFr.requestFocus() }; true
                         } else false
                     },
