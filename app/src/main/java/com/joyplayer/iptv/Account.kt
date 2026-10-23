@@ -130,7 +130,7 @@ fun AccountScreen(list: SavedList?, onBack: () -> Unit) {
 
     Column(
         Modifier.fillMaxSize()
-            .background(Brush.verticalGradient(listOf(Color(0xFF0E1A4A), Color(0xFF2A1040), Color(0xFF4A0E22))))
+            .screenBg()
             .padding(24.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
