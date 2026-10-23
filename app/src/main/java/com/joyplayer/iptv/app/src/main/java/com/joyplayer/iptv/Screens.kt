@@ -156,15 +156,22 @@ fun AppRoot() {
 
 @Composable
 fun Tile(label: String, icon: String, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(10.dp)
+    val bc = TileStyle.borderColor
     Box(
-        modifier.clip(RoundedCornerShape(10.dp))
-            .background(Brush.verticalGradient(listOf(C.Burgundy, C.BurgundyDark)))
+        modifier.clip(shape)
+            .background(Brush.verticalGradient(TileStyle.gradient()))
+            .then(if (bc != 0) Modifier.border(2.dp, Color(bc), shape) else Modifier)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(icon, fontSize = 34.sp)
-            Text(label, fontSize = 15.sp, color = C.Text)
+            Text(icon, fontSize = (34f * TileStyle.scales[TileStyle.iconSize]).sp)
+            Text(
+                label, fontSize = (15f * TileStyle.scales[TileStyle.textSize]).sp,
+                color = if (TileStyle.textColor == 0) C.Text else Color(TileStyle.textColor),
+                fontFamily = TileStyle.fontFamilies[TileStyle.font]
+            )
         }
     }
 }
