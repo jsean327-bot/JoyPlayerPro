@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
@@ -289,12 +290,25 @@ fun NavItem(label: String, active: Boolean, onClick: () -> Unit) {
 fun CatRow(
     label: String, count: Int, selected: Boolean, onLongClick: (() -> Unit)? = null,
     starred: Boolean? = null, onStar: (() -> Unit)? = null,
-    checked: Boolean? = null, onCheck: (() -> Unit)? = null, onClick: () -> Unit
+    checked: Boolean? = null, onCheck: (() -> Unit)? = null,
+    onMoveKey: ((Int) -> Unit)? = null, onClick: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(if (selected) C.Burgundy else C.Row)
+            .then(
+                if (onMoveKey == null) Modifier
+                else Modifier.onPreviewKeyEvent { e ->
+                    // a ticked category follows the remote: Up / Down carry it
+                    if (e.type != androidx.compose.ui.input.key.KeyEventType.KeyDown) false
+                    else when (e.key) {
+                        androidx.compose.ui.input.key.Key.DirectionUp -> { onMoveKey(-1); true }
+                        androidx.compose.ui.input.key.Key.DirectionDown -> { onMoveKey(1); true }
+                        else -> false
+                    }
+                }
+            )
             .combinedClickable(onLongClick = onLongClick, onClick = onClick).padding(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
@@ -497,12 +511,13 @@ fun LiveScreen(
                     item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
                     item { CatRow("Favorite", favCount, cat == "*fav*") { cat = "*fav*" } }
                     item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
-                    items(groups) { (g, n) ->
+                    items(groups, key = { it.first }) { (g, n) ->
                         CatRow(
                             (if (g in closed) "🔒 " else "") + g, n, cat == g,
                             onLongClick = { toggleFavCat(g) },
                             starred = if (editCats) null else g in favCatSet, onStar = { toggleFavCat(g) },
-                            checked = if (editCats) g in picked else null, onCheck = { togglePick(g) }
+                            checked = if (editCats) g in picked else null, onCheck = { togglePick(g) },
+                            onMoveKey = if (editCats && g in picked) ({ d -> movePicked(d) }) else null
                         ) { if (editCats) togglePick(g) else pickCat(g) }
                     }
                 }
