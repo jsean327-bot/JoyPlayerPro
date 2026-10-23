@@ -154,7 +154,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             CatOpt("*rec*", "Resume to Watch", recents.size),
             CatOpt("*all*", "All", vis.size),
             CatOpt("*fav*", "Favorite", vis.count { it.id.toString() in favs || it.cat in favCatSet })
-        ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + (if (it.first in favCatSet) "⭐ " else "") + it.first, it.second) }
+        ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + it.first, it.second, it.first in favCatSet) }
     }
 
     val sortRow: @Composable () -> Unit = {
@@ -262,8 +262,9 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                         item { CatRow("Favorite", vis.count { it.id.toString() in favs || it.cat in favCatSet }, cat == "*fav*") { cat = "*fav*" } }
                         items(groups) { (g, n) ->
                             CatRow(
-                                (if (g in closed) "🔒 " else "") + (if (g in favCatSet) "⭐ " else "") + g, n, cat == g,
-                                onLongClick = { toggleFavCat(g) }
+                                (if (g in closed) "🔒 " else "") + g, n, cat == g,
+                                onLongClick = { toggleFavCat(g) },
+                                starred = g in favCatSet, onStar = { toggleFavCat(g) }
                             ) { pickCat(g) }
                         }
                     }
