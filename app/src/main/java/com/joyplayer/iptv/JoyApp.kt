@@ -63,8 +63,8 @@ fun JoyApp() {
     val liveChannels = remember(channels, sortMode, hiddenLive) {
         val base = channels.filter { it.group !in hiddenLive }
         when (sortMode) {
-            1 -> base.sortedBy { it.name.lowercase() }
-            2 -> base.sortedByDescending { it.name.lowercase() }
+            1 -> base.sortedByTitle(false) { it.name }
+            2 -> base.sortedByTitle(true) { it.name }
             else -> base
         }
     }
