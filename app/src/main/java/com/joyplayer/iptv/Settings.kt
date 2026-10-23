@@ -369,12 +369,21 @@ fun SettingsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             gridItems(tiles) { (id, label) ->
+                val tbc = TileStyle.borderColor
                 Box(
                     Modifier.height(64.dp).clip(RoundedCornerShape(8.dp))
-                        .background(Brush.verticalGradient(listOf(C.Burgundy, C.BurgundyDark)))
+                        .background(Brush.verticalGradient(TileStyle.gradient()))
+                        .then(if (tbc != 0) Modifier.border(2.dp, Color(tbc), RoundedCornerShape(8.dp)) else Modifier)
                         .clickable { tap(id) }.padding(horizontal = 14.dp),
                     contentAlignment = Alignment.CenterStart
-                ) { Text(label, color = Color.White, fontSize = 15.sp, maxLines = 2) }
+                ) {
+                    Text(
+                        label,
+                        color = if (TileStyle.textColor == 0) Color.White else Color(TileStyle.textColor),
+                        fontSize = (15f * TileStyle.scales[TileStyle.textSize]).sp,
+                        fontFamily = TileStyle.fontFamilies[TileStyle.font], maxLines = 2
+                    )
+                }
             }
         }
     }
