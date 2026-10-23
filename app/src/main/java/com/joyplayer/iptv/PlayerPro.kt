@@ -163,8 +163,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     PipSupport(player)
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     var overlay by remember { mutableStateOf(true) }
-    var btnsOpen by remember { mutableStateOf(false) }      // bottom buttons row (shown with OK)
-    var pendingOpen by remember { mutableStateOf(false) }   // OK was pressed: open the row when the key is released
+    var pendingOpen by remember { mutableStateOf(false) }   // OK was pressed: open the settings menu when the key is released
     var uiTick by remember { mutableStateOf(0) }   // bumped on every key press: restarts the auto-hide timer
     // touch-seek HUD (double-tap skip / hold-and-slide scrub)
     var seekHud by remember { mutableStateOf<String?>(null) }
@@ -354,43 +353,18 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     }
 
     // Hide the controls + top buttons by themselves while watching (5 s without any key / touch)
-    LaunchedEffect(overlay, btnsOpen, dialog, uiTick) {
-        if ((overlay || btnsOpen) && dialog.isEmpty()) {
+    LaunchedEffect(overlay, dialog, uiTick) {
+        if (overlay && dialog.isEmpty()) {
             delay(5000)
-            btnsOpen = false
             pv?.hideController()
         }
     }
 
-    // while the buttons row is open, lift the player's own bar (time / seek bar / gear) so the row sits right under it
-    var liftApplied by remember { mutableStateOf(0) }
-    val liftWant = if (btnsOpen) (48 * ctx.resources.displayMetrics.density).toInt() else 0
-    LaunchedEffect(btnsOpen, pv) {
-        val v0 = pv ?: return@LaunchedEffect
-        val delta = liftWant - liftApplied
-        if (delta != 0) {
-            for (name in listOf("exo_bottom_bar", "exo_progress")) {
-                val id = ctx.resources.getIdentifier(name, "id", ctx.packageName)
-                val v = if (id != 0) v0.findViewById<View>(id) else null
-                val lp = v?.layoutParams as? ViewGroup.MarginLayoutParams
-                if (v != null && lp != null) {
-                    lp.bottomMargin += delta
-                    v.layoutParams = lp
-                }
-            }
-            liftApplied = liftWant
-        }
-    }
-    BackHandler(enabled = btnsOpen) { btnsOpen = false }
 
-    // Remote: show the top buttons (Audio, Subtitles, Quality ...) and move the focus onto them
-    fun focusButtons() {
-        btnsOpen = true
+    // Settings menu (Audio, Subtitles, Quality ...): opened with OK / Menu on the remote, or by tapping the gear
+    fun openMenu() {
         pv?.showController()
-        scope.launch {
-            delay(160)
-            runCatching { firstBtnFr.requestFocus() }
-        }
+        dialog = "menu"
     }
 
     // Remote control: keep focus on the video so OK / left / right work, return to it after dialogs.
@@ -515,7 +489,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     (e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter)
                 ) {
                     pendingOpen = false
-                    focusButtons()
+                    openMenu()
                     return@onPreviewKeyEvent true
                 }
                 if (!boxFocused || dialog.isNotEmpty() || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -565,7 +539,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                         if (canZap) dialog = "chans" else pv?.showController()
                         true
                     }
-                    Key.Menu -> { focusButtons(); true }
+                    Key.Menu -> { openMenu(); true }
                     Key.DirectionDown -> { pv?.showController(); true }
                     else -> false
                 }
@@ -579,6 +553,9 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     this.player = player
                     pv = this
                     AppPrefs.styleSubtitles(this)
+                    // the player's gear opens our settings menu
+                    val gearId = c.resources.getIdentifier("exo_settings", "id", c.packageName)
+                    if (gearId != 0) findViewById<View>(gearId)?.setOnClickListener { openMenu() }
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                     )
@@ -760,51 +737,33 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     .fillMaxWidth(if (narrow) 1f else 0.42f)
             )
         }
-        if (btnsOpen && !PipState.inPip) {
-            Row(
-                // bottom of the screen, directly under the player's own bar with the settings gear
-                Modifier.align(Alignment.BottomEnd).padding(start = 12.dp, end = 12.dp, bottom = 6.dp)
-                    .horizontalScroll(rememberScrollState())
-                    .onPreviewKeyEvent { e ->
-                        if (e.type == KeyEventType.KeyDown) uiTick++
-                        if (e.type == KeyEventType.KeyDown && e.key == Key.DirectionUp) {
-                            runCatching { boxFr.requestFocus() }; true
-                        } else false
-                    },
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (hasMeta) OverlayBtn("⏯ Play / Pause", Modifier.focusRequester(firstBtnFr)) {
+        when (dialog) {
+            "menu" -> PlayerDialog("Settings", { dialog = "" }) {
+                if (hasMeta) Opt("⏯  Play / Pause", false) {
                     if (player.isPlaying) player.pause() else player.play()
+                    dialog = ""
                 }
-                if (canZap) {
-                    OverlayBtn("⏮ CH") { zap(-1) }
-                    OverlayBtn("CH ⏭") { zap(1) }
-                    OverlayBtn("↩ Last") { lastChannel() }
-                    OverlayBtn("☰ Channels") { dialog = "chans" }
-                }
-                OverlayBtn("🔊 Audio", if (hasMeta) Modifier else Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
-                OverlayBtn("💬 Subtitles") { dialog = "subs" }
-                OverlayBtn("⚙ Quality") { dialog = "quality" }
-                if (hasMeta) OverlayBtn("⏩ " + (if (speed == 1f) "1x" else "${speed}x")) { dialog = "speed" }
-                OverlayBtn(if (sleepEnd > 0L) "😴 ${sleepLeft}m" else "😴 Sleep") { dialog = "sleep" }
-                if (castCtx != null) OverlayBtn("📡 Cast") { dialog = "cast" }
-                OverlayBtn(
-                    when (resizeMode) { 4 -> "⤢ Zoom"; 3 -> "⤢ Stretch"; else -> "⤢ Fit" }
+                Opt("🔊  Audio", false) { dialog = "audio" }
+                Opt("💬  Subtitles", false) { dialog = "subs" }
+                Opt("⚙  Quality", false) { dialog = "quality" }
+                if (hasMeta) Opt("⏩  Speed  " + (if (speed == 1f) "1x" else "${speed}x"), false) { dialog = "speed" }
+                Opt(if (sleepEnd > 0L) "😴  Sleep  ${sleepLeft}m" else "😴  Sleep", false) { dialog = "sleep" }
+                Opt(
+                    "⤢  " + when (resizeMode) { 4 -> "Zoom"; 3 -> "Stretch"; else -> "Fit" }, false
                 ) {
                     resizeMode = when (resizeMode) { 0 -> 4; 4 -> 3; else -> 0 }
                     playerPrefs.edit().putInt("resize", resizeMode).apply()
                 }
-                OverlayBtn("🖼 PiP") { PipState.request(ctx) }
+                Opt("🖼  PiP", false) { dialog = ""; PipState.request(ctx) }
+                if (castCtx != null) Opt("📡  Cast", false) { dialog = "cast" }
                 PlayQueue.nextAfter(ch.url)?.let { nx ->
-                    if (hasMeta) OverlayBtn("⏭ Next") {
+                    if (hasMeta) Opt("⏭  Next", false) {
+                        dialog = ""
                         PlayMeta.map[nx.first.url] = nx.second
                         PlayQueue.play?.invoke(nx.first)
                     }
                 }
             }
-        }
-
-        when (dialog) {
             "audio" -> PlayerDialog("Audio / Dubbing", { dialog = "" }) {
                 val items = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                     .flatMap { g -> (0 until g.length).map { g to it } }
