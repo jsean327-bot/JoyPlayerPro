@@ -28,9 +28,11 @@ data class CatOpt(val key: String, val label: String, val count: Int, val fav: B
 @Composable
 fun CategoryButton(
     current: String, options: List<CatOpt>, onPick: (String) -> Unit, modifier: Modifier = Modifier,
-    onLongPick: ((String) -> Unit)? = null
+    onLongPick: ((String) -> Unit)? = null,
+    onMove: ((String, Int) -> Unit)? = null, onResetOrder: (() -> Unit)? = null
 ) {
     var open by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
     val cur = options.firstOrNull { it.key == current }
     Button(
         onClick = { open = true }, modifier = modifier,
@@ -47,11 +49,16 @@ fun CategoryButton(
                     "Categories", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
+                if (onMove != null && onResetOrder != null) {
+                    OrderBar(editing, { editing = !editing }, onResetOrder)
+                }
                 androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp)) {
                     items(options) { o ->
                         CatRow(
                             o.label, o.count, o.key == current, onLongClick = onLongPick?.let { f -> { f(o.key) } },
-                            starred = o.fav, onStar = onLongPick?.let { f -> { f(o.key) } }
+                            starred = if (editing) null else o.fav, onStar = onLongPick?.let { f -> { f(o.key) } },
+                            onUp = if (editing && onMove != null && !o.key.startsWith("*")) ({ onMove(o.key, -1) }) else null,
+                            onDown = if (editing && onMove != null && !o.key.startsWith("*")) ({ onMove(o.key, 1) }) else null
                         ) { onPick(o.key); open = false }
                     }
                 }
