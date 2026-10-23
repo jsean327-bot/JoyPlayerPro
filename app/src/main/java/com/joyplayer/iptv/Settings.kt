@@ -142,6 +142,17 @@ object AppPrefs {
     fun clearPin() { p?.edit()?.remove("pin")?.apply() }
     fun checkPin(pin: String): Boolean = hashPin(pin) == (p?.getString("pin", "") ?: "")
 
+    /** Favorite categories (pinned to the top of the category list, shown with a star). */
+    fun favCats(kind: String, listId: String?): Set<String> =
+        if (listId == null) emptySet() else gs("favcat_${kind}_$listId")
+
+    fun toggleFavCat(kind: String, listId: String, cat: String): Set<String> {
+        val cur = gs("favcat_${kind}_$listId")
+        val next = if (cat in cur) cur - cat else cur + cat
+        ps("favcat_${kind}_$listId", next)
+        return next
+    }
+
     fun hidden(kind: String, listId: String?): Set<String> =
         if (listId == null) emptySet() else gs("hid_${kind}_$listId")
 
