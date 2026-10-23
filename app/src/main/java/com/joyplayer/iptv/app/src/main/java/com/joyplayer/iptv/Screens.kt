@@ -183,7 +183,7 @@ fun HomeScreen(
     onPlay: (Channel) -> Unit = {}
 ) {
     val compact = rememberIsCompact()
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color(0xFF0E1A4A), C.Bg)))) {
+    Box(Modifier.fillMaxSize().wallpaper()) {
         Column(Modifier.align(Alignment.TopEnd).padding(16.dp), horizontalAlignment = Alignment.End) {
             Text(if (loading) "Loading..." else listName, color = C.Text)
             ClockText()
