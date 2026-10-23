@@ -91,6 +91,9 @@ object AppPrefs {
     fun setEpgManual(listId: String, v: String) { p?.edit()?.putString("epg_$listId", v.trim())?.apply() }
     fun setEpgAuto(listId: String, v: String) { p?.edit()?.putString("epg_auto_$listId", v.trim())?.apply() }
 
+    var wallpaper: Int
+        get() = gi("wallpaper", 0)
+        set(v) { pi("wallpaper", v) }
     var listLayout: Boolean
         get() = gi("listlayout", 0) == 1
         set(v) { pi("listlayout", if (v) 1 else 0) }
@@ -301,6 +304,7 @@ fun SettingsScreen(
         "parental" to "🔒  Parental Control",
         "playlist" to "📋  Change Playlist",
         "lang" to "🌐  Change Language",
+        "wall" to "🖼️  Main Screen Background",
         "layout" to "🔳  Change Layout",
         "hlive" to "🙈  Hide Live Categories",
         "hvod" to "🙈  Hide Vod Categories",
@@ -360,6 +364,24 @@ fun SettingsScreen(
         "lang" -> SDialog("Choose language", { dialog = "" }) {
             Lang.codes.forEachIndexed { i, c ->
                 SOpt(Lang.names[i], Lang.code == c) { Lang.set(c); dialog = "" }
+            }
+        }
+        "wall" -> SDialog("Choose Main Screen Background", { dialog = "" }, maxHeight = 360.dp) {
+            val sel = Wallpapers.current()
+            Wallpapers.list.indices.toList().chunked(3).forEach { rowIdx ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    rowIdx.forEach { i ->
+                        Box(
+                            Modifier.weight(1f).height(70.dp).clip(RoundedCornerShape(8.dp))
+                                .wallpaper(i)
+                                .then(if (i == sel) Modifier.border(3.dp, Color.White, RoundedCornerShape(8.dp)) else Modifier)
+                                .clickable { Wallpapers.set(i) },
+                            contentAlignment = Alignment.BottomCenter
+                        ) {
+                            Text(Wallpapers.list[i].name, color = Color.White, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+                        }
+                    }
+                }
             }
         }
         "layout" -> SDialog("Change Layout", { dialog = "" }) {
