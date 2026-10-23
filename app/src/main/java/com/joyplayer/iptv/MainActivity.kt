@@ -34,6 +34,19 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Lang.init(this)
+        // images (logos, posters): bigger memory + disk cache, lighter bitmaps, no fade (smoother lists)
+        coil.Coil.setImageLoader(
+            coil.ImageLoader.Builder(this)
+                .okHttpClient(Http.client)
+                .memoryCache { coil.memory.MemoryCache.Builder(this).maxSizePercent(0.25).build() }
+                .diskCache {
+                    coil.disk.DiskCache.Builder().directory(cacheDir.resolve("img")).maxSizeBytes(200L * 1024 * 1024).build()
+                }
+                .respectCacheHeaders(false)
+                .allowRgb565(true)
+                .crossfade(false)
+                .build()
+        )
         setContent {
             MaterialTheme(colorScheme = JoyColors) {
                 androidx.compose.runtime.CompositionLocalProvider(
