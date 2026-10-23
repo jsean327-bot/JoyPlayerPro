@@ -25,7 +25,13 @@ android {
         }
     }
     buildTypes {
-        debug { if (ks.exists()) signingConfig = signingConfigs.getByName("joy") }
+        debug {
+            if (ks.exists()) signingConfig = signingConfigs.getByName("joy")
+            // optimized build: not debuggable + R8 (much faster and lighter, same install / update)
+            isDebuggable = false
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
         release { isMinifyEnabled = false }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
