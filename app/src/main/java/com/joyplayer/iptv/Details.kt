@@ -28,7 +28,10 @@ import com.google.gson.Gson
 import com.google.gson.JsonElement
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -241,6 +244,13 @@ fun DetailScreen(
         }
     }
 
+    // Remote control: start directly on the Watch Now button (not on the back arrow)
+    val playFocus = remember { FocusRequester() }
+    LaunchedEffect(item.id) {
+        delay(250)
+        runCatching { playFocus.requestFocus() }
+    }
+
     val poster = detail?.poster ?: item.poster
     val backdrop = detail?.backdrop ?: poster
     val gold = Color(0xFFFFD54F)
@@ -263,7 +273,7 @@ fun DetailScreen(
                         val movieResume = !isSeries && resumeVer >= 0 && ResumeStore.get(item.url) > 0L
                         val bw = if (compact) Modifier.weight(1f) else Modifier
                         Button(
-                            modifier = bw,
+                            modifier = bw.focusRequester(playFocus),
                             onClick = {
                                 if (!isSeries) playMovie()
                                 else if (cont != null) playQueued(cont.first, cont.second)
