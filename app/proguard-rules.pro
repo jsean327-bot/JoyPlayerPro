@@ -1,0 +1,17 @@
+# JoyPlayer: shrink and speed up the libraries, but keep the app's own classes untouched
+# (they are read by Gson / Retrofit and started from the manifest).
+-dontobfuscate
+-keep class com.joyplayer.iptv.** { *; }
+-keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod,Exceptions
+-keep class kotlin.Metadata { *; }
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+-keepclassmembers,allowobfuscation class * { @com.google.gson.annotations.SerializedName <fields>; }
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-dontwarn retrofit2.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
+-dontwarn javax.annotation.**
+-dontwarn kotlin.Unit
