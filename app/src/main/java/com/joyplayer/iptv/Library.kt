@@ -102,8 +102,8 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
         when (order) {
             1 -> base.sortedByDescending { it.added }
             2 -> base.sortedByDescending { it.rating }
-            3 -> base.sortedBy { it.name.lowercase() }
-            4 -> base.sortedByDescending { it.name.lowercase() }
+            3 -> base.sortedByTitle(false) { it.name }
+            4 -> base.sortedByTitle(true) { it.name }
             else -> base
         }
     }
