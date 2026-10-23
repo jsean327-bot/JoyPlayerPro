@@ -352,20 +352,24 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         }
     }
 
-    // Hide the controls + top buttons by themselves while watching (5 s without any key / touch)
-    LaunchedEffect(overlay, dialog, uiTick) {
-        if (overlay && dialog.isEmpty()) {
-            delay(5000)
-            pv?.hideController()
-        }
-    }
-
-
     // Settings menu (Audio, Subtitles, Quality ...): opened with OK / Menu on the remote, or by tapping the gear
     fun openMenu() {
         pv?.showController()
         dialog = "menu"
     }
+
+    // OK on the remote: show the player's own controls (back / play-pause / forward / gear) and put the focus on them
+    fun showControls() {
+        pv?.showController()
+        scope.launch {
+            delay(150)
+            val id = ctx.resources.getIdentifier("exo_play_pause", "id", ctx.packageName)
+            val v = if (id != 0) pv?.findViewById<View>(id) else null
+            if (v != null && v.visibility == View.VISIBLE) v.requestFocus() else pv?.requestFocus()
+        }
+    }
+    // Back while the controls have the focus: just hide them (second Back leaves the player)
+    BackHandler(enabled = overlay && !boxFocused && dialog.isEmpty()) { pv?.hideController() }
 
     // Remote control: keep focus on the video so OK / left / right work, return to it after dialogs.
     LaunchedEffect(dialog, overlay) {
@@ -489,7 +493,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     (e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter)
                 ) {
                     pendingOpen = false
-                    openMenu()
+                    showControls()
                     return@onPreviewKeyEvent true
                 }
                 if (!boxFocused || dialog.isNotEmpty() || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
