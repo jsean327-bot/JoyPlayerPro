@@ -341,7 +341,7 @@ fun LiveScreen(
             ).show()
         }
     }
-    val favCount = remember(all, favs) { all.count { it.url in favs } }
+    val favCount = remember(all, favs, favCatSet) { all.count { it.url in favs || it.group in favCatSet } }
     val recentCount = remember(all, histVersion) {
         val urls = all.asSequence().map { it.url }.toHashSet()
         LiveHistory.list().count { it in urls }
@@ -349,7 +349,7 @@ fun LiveScreen(
     val index by produceState(emptyList<String>(), all) {
         value = withContext(Dispatchers.Default) { all.map { normSearch(it.name + " " + it.group) } }
     }
-    val shown = remember(all, index, favs, cat, query, histVersion) {
+    val shown = remember(all, index, favs, cat, query, histVersion, favCatSet) {
         val words = normSearch(query).split(' ').filter { it.isNotBlank() }
         when {
             words.isEmpty() && cat == "*rec*" -> {
@@ -359,7 +359,7 @@ fun LiveScreen(
             words.isEmpty() -> all.filter { c ->
                 when (cat) {
                     "*all*" -> true
-                    "*fav*" -> c.url in favs
+                    "*fav*" -> c.url in favs || c.group in favCatSet
                     else -> c.group == cat
                 }
             }
@@ -383,6 +383,9 @@ fun LiveScreen(
     val compact = rememberIsCompact()
     LaunchedEffect(closed) { if (cat in closed) cat = "*all*" }
     val pickCat: (String) -> Unit = { c -> if (c in closed) pinFor = c else cat = c }
+    val toastFav: (Boolean) -> Unit = { added ->
+        Toast.makeText(ctx, Lang.tr(if (added) "Added to favorites" else "Removed from favorites"), Toast.LENGTH_SHORT).show()
+    }
     val onRowClick: (Channel) -> Unit = { ch ->
         if (ch.url == selUrl) onFull(ch) else { selUrl = ch.url; LiveHistory.push(ch.url) }
     }
@@ -426,7 +429,7 @@ fun LiveScreen(
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
                 itemsIndexed(shown) { i, ch ->
-                    LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null) { onRowClick(ch) }
+                    LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
                 }
             }
         }
@@ -460,7 +463,7 @@ fun LiveScreen(
                 }
                 LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
                     itemsIndexed(shown) { i, ch ->
-                        LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null) { onRowClick(ch) }
+                        LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
                     }
                 }
                 LivePane(player, sel, favs, onFav, onFull, false, Modifier.weight(0.36f).fillMaxHeight().padding(8.dp))
@@ -475,17 +478,18 @@ fun LiveScreen(
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun LiveRow(
     i: Int, ch: Channel, isSel: Boolean, showGroup: Boolean, fav: Boolean,
-    focus: FocusRequester?, onClick: () -> Unit
+    focus: FocusRequester?, onLong: () -> Unit, onClick: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 3.dp, vertical = 1.dp)
             .then(if (focus != null) Modifier.focusRequester(focus) else Modifier)
             .clip(RoundedCornerShape(6.dp))
             .background(if (isSel) C.Blue else C.Row)
-            .clickable(onClick = onClick)
+            .combinedClickable(onLongClick = onLong, onClick = onClick)
             .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
