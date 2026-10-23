@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 
-data class CatOpt(val key: String, val label: String, val count: Int)
+data class CatOpt(val key: String, val label: String, val count: Int, val fav: Boolean? = null)
 
 /** Category picker used on narrow (portrait) screens instead of the left-hand category pane. */
 @Composable
@@ -49,7 +49,10 @@ fun CategoryButton(
                 )
                 androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp)) {
                     items(options) { o ->
-                        CatRow(o.label, o.count, o.key == current, onLongClick = onLongPick?.let { f -> { f(o.key) } }) { onPick(o.key); open = false }
+                        CatRow(
+                            o.label, o.count, o.key == current, onLongClick = onLongPick?.let { f -> { f(o.key) } },
+                            starred = o.fav, onStar = onLongPick?.let { f -> { f(o.key) } }
+                        ) { onPick(o.key); open = false }
                     }
                 }
             }
