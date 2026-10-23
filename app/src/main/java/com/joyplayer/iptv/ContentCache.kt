@@ -47,11 +47,12 @@ object ContentCache {
         }
     }
 
-    private fun write(kind: String, l: SavedList, data: Any) {
+    private fun write(kind: String, l: SavedList, data: Any, type: java.lang.reflect.Type) {
         val f = file(kind, l) ?: return
         try {
             val tmp = File(f.parentFile, f.name + ".tmp")
-            tmp.writeText(gson.toJson(data), Charsets.UTF_8)
+            // streamed straight into the file: no giant string in memory (that ran out of memory on TV boxes)
+            tmp.writer(Charsets.UTF_8).buffered(64 * 1024).use { w -> gson.toJson(data, type, w) }
             if (!tmp.renameTo(f)) {
                 f.delete()
                 tmp.renameTo(f)
@@ -65,14 +66,14 @@ object ContentCache {
         read<List<Channel>>("live", l, chType, ignoreAge)?.takeIf { it.isNotEmpty() }
 
     fun putChannels(l: SavedList, list: List<Channel>) {
-        if (list.isNotEmpty()) write("live", l, list)
+        if (list.isNotEmpty()) write("live", l, list, chType)
     }
 
     fun vod(l: SavedList, series: Boolean, ignoreAge: Boolean = false): List<LibItem>? =
         read<List<LibItem>>(if (series) "series" else "movies", l, vodType, ignoreAge)?.takeIf { it.isNotEmpty() }
 
     fun putVod(l: SavedList, series: Boolean, list: List<LibItem>) {
-        if (list.isNotEmpty()) write(if (series) "series" else "movies", l, list)
+        if (list.isNotEmpty()) write(if (series) "series" else "movies", l, list, vodType)
     }
 
     /** Forget everything stored for one playlist (used by Reload). */
