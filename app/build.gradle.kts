@@ -27,10 +27,9 @@ android {
     buildTypes {
         debug {
             if (ks.exists()) signingConfig = signingConfigs.getByName("joy")
-            // optimized build: not debuggable + R8 (much faster and lighter, same install / update)
+            // optimized build: not debuggable (faster, same install / update)
             isDebuggable = false
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            isMinifyEnabled = false   // R8 shrinking is off for now (it broke Movies / Series)
         }
         release { isMinifyEnabled = false }
     }
