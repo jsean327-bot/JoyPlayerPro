@@ -91,7 +91,14 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     LaunchedEffect(closed) { if (cat in closed) cat = "*all*" }
     val pickCat: (String) -> Unit = { c -> if (c in closed) pinFor = c else cat = c }
 
-    val groups = remember(all) { all.groupBy { it.cat }.map { it.key to it.value.size } }
+    val groups = remember(all, order) {
+        val g = all.groupBy { it.cat }.map { it.key to it.value.size }
+        when (order) {
+            3 -> g.sortedByCategory(false) { it.first }
+            4 -> g.sortedByCategory(true) { it.first }
+            else -> g
+        }
+    }
     val shown = remember(vis, favs, recents, cat, query, order) {
         val base = when (if (query.isBlank()) cat else "*all*") {
             "*all*" -> vis
