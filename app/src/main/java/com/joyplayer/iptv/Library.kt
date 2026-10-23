@@ -182,7 +182,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     }
 
     if (compact) {
-        Column(Modifier.fillMaxSize().background(LibBrush)) {
+        Column(Modifier.fillMaxSize().screenBg()) {
             Row(
                 Modifier.fillMaxWidth().background(Color(0x55000000))
                     .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
@@ -208,7 +208,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             Box(Modifier.weight(1f).fillMaxWidth()) { gridArea() }
         }
     } else {
-        Column(Modifier.fillMaxSize().background(LibBrush)) {
+        Column(Modifier.fillMaxSize().screenBg()) {
             Row(
                 Modifier.fillMaxWidth().background(Color(0x55000000)).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -334,7 +334,7 @@ fun SeriesDetail(list: SavedList, item: LibItem, onBack: () -> Unit, onPlay: (Ch
         }
         loading = false
     }
-    Column(Modifier.fillMaxSize().background(LibBrush).padding(16.dp)) {
+    Column(Modifier.fillMaxSize().screenBg().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("← Back", color = C.Text, modifier = Modifier.clickable(onClick = onBack).padding(8.dp))
             Spacer(Modifier.width(12.dp))
