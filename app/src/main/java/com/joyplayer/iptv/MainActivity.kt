@@ -34,6 +34,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Lang.init(this)
+        CrashLog.install(this)
         // images (logos, posters): bigger memory + disk cache, lighter bitmaps, no fade (smoother lists)
         coil.Coil.setImageLoader(
             coil.ImageLoader.Builder(this)
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Box(Modifier.fillMaxSize().wallpaper(inner = true)) {
                         Surface(Modifier.fillMaxSize(), color = androidx.compose.ui.graphics.Color.Transparent) { JoyApp() }
+                        CrashNotice()
                     }
                 }
             }
