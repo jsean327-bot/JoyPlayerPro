@@ -153,6 +153,15 @@ object AppPrefs {
         return next
     }
 
+    /** Own order of the categories, saved as the list of names. */
+    fun catOrder(kind: String, listId: String?): List<String> =
+        if (listId == null) emptyList()
+        else (p?.getString("catorder_${kind}_$listId", "") ?: "").split("\n").filter { it.isNotEmpty() }
+
+    fun setCatOrder(kind: String, listId: String, v: List<String>) {
+        p?.edit()?.putString("catorder_${kind}_$listId", v.joinToString("\n"))?.apply()
+    }
+
     fun hidden(kind: String, listId: String?): Set<String> =
         if (listId == null) emptySet() else gs("hid_${kind}_$listId")
 
