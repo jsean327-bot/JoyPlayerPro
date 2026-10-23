@@ -28,11 +28,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
+private const val REMOVED = true
+
 /** "Continue Watching": unfinished movies and episodes, one tap to carry on where you stopped. */
 @Composable
 fun ContinueRow(onPlay: (Channel) -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
-    if (!isTvDevice(ctx)) return   // phones: hidden (it was in the way); Fire TV / Android TV keep it
+    if (REMOVED) return   // Continue Watching row is switched off everywhere (user request)
     ResumeStore.init(ctx)
     val ver = ResumeStore.version
     val items = remember(ver) { ResumeStore.recent(12) }
