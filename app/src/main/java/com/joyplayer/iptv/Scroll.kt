@@ -77,8 +77,11 @@ fun FastScroller(
 
 // Same name as the built-in list so existing screens get a scrollbar automatically
 @Composable
-fun LazyColumn(modifier: Modifier = Modifier, content: LazyListScope.() -> Unit) {
-    val state = rememberLazyListState()
+fun LazyColumn(
+    modifier: Modifier = Modifier,
+    state: androidx.compose.foundation.lazy.LazyListState = rememberLazyListState(),
+    content: LazyListScope.() -> Unit
+) {
     val scope = rememberCoroutineScope()
     val fraction by remember {
         derivedStateOf {
