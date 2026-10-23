@@ -43,7 +43,9 @@ object Wallpapers {
 
 /** Paints background number [i] (default: the chosen one). */
 @Composable
-fun Modifier.wallpaper(i: Int = Wallpapers.current()): Modifier {
+fun Modifier.wallpaper(i: Int = Wallpapers.current(), inner: Boolean = false): Modifier {
+    // inner screens keep their original dark look while the "Classic" background is selected
+    if (inner && i == 0) return this.background(C.Bg)
     val w = Wallpapers.list[i.coerceIn(0, Wallpapers.list.size - 1)]
     return this
         .background(Brush.verticalGradient(listOf(w.top, w.bottom)))
@@ -65,3 +67,10 @@ fun Modifier.wallpaper(i: Int = Wallpapers.current()): Modifier {
             }
         }
 }
+
+/** Background of the Movies / Series / Settings / Account / Details screens: their purple look for "Classic", else the chosen one. */
+@Composable
+fun Modifier.screenBg(): Modifier =
+    if (Wallpapers.current() == 0)
+        this.background(Brush.verticalGradient(listOf(Color(0xFF0E1A4A), Color(0xFF2A1040), Color(0xFF4A0E22))))
+    else this.wallpaper()
