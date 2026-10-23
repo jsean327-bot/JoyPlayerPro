@@ -1,7 +1,8 @@
 package com.joyplayer.iptv
 
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonToken
+import okhttp3.Request
 import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -115,38 +116,96 @@ object Vod {
         }
     }
 
+    private fun JsonReader.str(): String? = when (peek()) {
+        JsonToken.NULL -> { nextNull(); null }
+        JsonToken.STRING, JsonToken.NUMBER -> nextString()
+        JsonToken.BOOLEAN -> nextBoolean().toString()
+        else -> { skipValue(); null }
+    }
+
+    /**
+     * Reads the big JSON list straight from the network, item by item, keeping only the fields we show.
+     * (Loading the whole thing as objects used up all the memory on TV boxes.)
+     */
+    private fun <T> streamArray(url: String, item: (JsonReader) -> T?): List<T> {
+        val req = Request.Builder().url(url).header("User-Agent", "VLC/3.0.18 LibVLC/3.0.18").build()
+        Http.client.newCall(req).execute().use { r ->
+            if (!r.isSuccessful) error("HTTP ${r.code}")
+            val body = r.body ?: error("Empty answer")
+            JsonReader(body.charStream().buffered(64 * 1024)).use { rd ->
+                rd.isLenient = true
+                val out = ArrayList<T>()
+                if (rd.peek() != JsonToken.BEGIN_ARRAY) { rd.skipValue(); return out }
+                rd.beginArray()
+                while (rd.hasNext()) {
+                    if (rd.peek() == JsonToken.BEGIN_OBJECT) item(rd)?.let { out.add(it) } else rd.skipValue()
+                }
+                rd.endArray()
+                return out
+            }
+        }
+    }
+
     private suspend fun fetchRemote(l: SavedList, series: Boolean): List<LibItem> {
         val b = base(l.server)
         val a = api(b)
-        // categories and the big list are asked at the same time
-        val (cats, seriesList, movieList) = coroutineScope {
-            val c = async { if (series) a.seriesCats(l.user, l.pass) else a.movieCats(l.user, l.pass) }
-            val sl = async { if (series) a.series(l.user, l.pass) else emptyList() }
-            val ml = async { if (series) emptyList() else a.movies(l.user, l.pass) }
-            Triple(c.await(), sl.await(), ml.await())
-        }
+        val cats = if (series) a.seriesCats(l.user, l.pass) else a.movieCats(l.user, l.pass)
         val names = cats.associate { it.id to (it.name ?: "Other") }
-        val items = if (series) {
-            seriesList.mapNotNull { s ->
-                val id = s.id ?: return@mapNotNull null
-                LibItem(
-                    id, s.name ?: "Series $id", s.cover?.ifBlank { null },
-                    s.rating?.toDoubleOrNull() ?: 0.0, s.added?.toLongOrNull() ?: 0L,
-                    names[s.cat] ?: "Other", ""
-                )
+        fun enc(x: String) = java.net.URLEncoder.encode(x, "UTF-8")
+        val api = "${b}player_api.php?username=${enc(l.user)}&password=${enc(l.pass)}&action="
+        return if (series) {
+            streamArray(api + "get_series") { rd ->
+                var id: Int? = null; var name: String? = null; var cover: String? = null
+                var rating: String? = null; var added: String? = null; var cat: String? = null
+                rd.beginObject()
+                while (rd.hasNext()) {
+                    when (rd.nextName()) {
+                        "series_id" -> id = rd.str()?.toIntOrNull()
+                        "name" -> name = rd.str()
+                        "cover" -> cover = rd.str()
+                        "rating" -> rating = rd.str()
+                        "last_modified" -> added = rd.str()
+                        "category_id" -> cat = rd.str()
+                        else -> rd.skipValue()
+                    }
+                }
+                rd.endObject()
+                id?.let {
+                    LibItem(
+                        it, name ?: "Series $it", cover?.ifBlank { null },
+                        rating?.toDoubleOrNull() ?: 0.0, added?.toLongOrNull() ?: 0L,
+                        names[cat] ?: "Other", ""
+                    )
+                }
             }
         } else {
-            movieList.mapNotNull { m ->
-                val id = m.id ?: return@mapNotNull null
-                LibItem(
-                    id, m.name ?: "Movie $id", m.icon?.ifBlank { null },
-                    m.rating?.toDoubleOrNull() ?: 0.0, m.added?.toLongOrNull() ?: 0L,
-                    names[m.cat] ?: "Other",
-                    "${b}movie/${l.user}/${l.pass}/$id.${m.ext ?: "mp4"}"
-                )
+            streamArray(api + "get_vod_streams") { rd ->
+                var id: Int? = null; var name: String? = null; var icon: String? = null
+                var rating: String? = null; var added: String? = null; var cat: String? = null; var ext: String? = null
+                rd.beginObject()
+                while (rd.hasNext()) {
+                    when (rd.nextName()) {
+                        "stream_id" -> id = rd.str()?.toIntOrNull()
+                        "name" -> name = rd.str()
+                        "stream_icon" -> icon = rd.str()
+                        "rating" -> rating = rd.str()
+                        "added" -> added = rd.str()
+                        "category_id" -> cat = rd.str()
+                        "container_extension" -> ext = rd.str()
+                        else -> rd.skipValue()
+                    }
+                }
+                rd.endObject()
+                id?.let {
+                    LibItem(
+                        it, name ?: "Movie $it", icon?.ifBlank { null },
+                        rating?.toDoubleOrNull() ?: 0.0, added?.toLongOrNull() ?: 0L,
+                        names[cat] ?: "Other",
+                        "${b}movie/${l.user}/${l.pass}/$it.${ext ?: "mp4"}"
+                    )
+                }
             }
         }
-        return items
     }
 
     suspend fun episodes(l: SavedList, seriesId: Int): Map<String, List<Channel>> {
