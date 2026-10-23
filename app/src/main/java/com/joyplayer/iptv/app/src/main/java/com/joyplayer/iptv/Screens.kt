@@ -379,9 +379,9 @@ fun LiveScreen(
                 CatOpt("*rec*", "Recently watched", recentCount)
             ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + it.first, it.second) }
         }
-        Column(Modifier.fillMaxSize().background(C.Bg)) {
+        Column(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().background(Color(0xFF0B1330))
+                Modifier.fillMaxWidth().background(Color(0xCC0B1330))
                     .horizontalScroll(rememberScrollState()).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -409,9 +409,9 @@ fun LiveScreen(
             }
         }
     } else {
-        Column(Modifier.fillMaxSize().background(C.Bg)) {
+        Column(Modifier.fillMaxSize()) {
             Row(
-                Modifier.fillMaxWidth().background(Color(0xFF0B1330)).padding(horizontal = 8.dp),
+                Modifier.fillMaxWidth().background(Color(0xCC0B1330)).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 NavItem("Home", false) { onNav("home") }
