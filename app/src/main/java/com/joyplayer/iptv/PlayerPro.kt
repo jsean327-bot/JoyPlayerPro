@@ -163,6 +163,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     PipSupport(player)
     var tracks by remember(player) { mutableStateOf(player.currentTracks) }
     var overlay by remember { mutableStateOf(true) }
+    var btnsOpen by remember { mutableStateOf(false) }      // bottom buttons row (shown with OK)
+    var pendingOpen by remember { mutableStateOf(false) }   // OK was pressed: open the row when the key is released
     var uiTick by remember { mutableStateOf(0) }   // bumped on every key press: restarts the auto-hide timer
     // touch-seek HUD (double-tap skip / hold-and-slide scrub)
     var seekHud by remember { mutableStateOf<String?>(null) }
@@ -352,15 +354,38 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     }
 
     // Hide the controls + top buttons by themselves while watching (5 s without any key / touch)
-    LaunchedEffect(overlay, dialog, uiTick) {
-        if (overlay && dialog.isEmpty()) {
+    LaunchedEffect(overlay, btnsOpen, dialog, uiTick) {
+        if ((overlay || btnsOpen) && dialog.isEmpty()) {
             delay(5000)
+            btnsOpen = false
             pv?.hideController()
         }
     }
 
+    // while the buttons row is open, lift the player's own bar (time / seek bar / gear) so the row sits right under it
+    var liftApplied by remember { mutableStateOf(0) }
+    val liftWant = if (btnsOpen) (48 * ctx.resources.displayMetrics.density).toInt() else 0
+    LaunchedEffect(btnsOpen, pv) {
+        val v0 = pv ?: return@LaunchedEffect
+        val delta = liftWant - liftApplied
+        if (delta != 0) {
+            for (name in listOf("exo_bottom_bar", "exo_progress")) {
+                val id = ctx.resources.getIdentifier(name, "id", ctx.packageName)
+                val v = if (id != 0) v0.findViewById<View>(id) else null
+                val lp = v?.layoutParams as? ViewGroup.MarginLayoutParams
+                if (v != null && lp != null) {
+                    lp.bottomMargin += delta
+                    v.layoutParams = lp
+                }
+            }
+            liftApplied = liftWant
+        }
+    }
+    BackHandler(enabled = btnsOpen) { btnsOpen = false }
+
     // Remote: show the top buttons (Audio, Subtitles, Quality ...) and move the focus onto them
     fun focusButtons() {
+        btnsOpen = true
         pv?.showController()
         scope.launch {
             delay(160)
@@ -486,6 +511,13 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             .onFocusChanged { boxFocused = it.isFocused }
             .onPreviewKeyEvent { e ->
                 if (e.type == KeyEventType.KeyDown) uiTick++
+                if (e.type == KeyEventType.KeyUp && pendingOpen &&
+                    (e.key == Key.DirectionCenter || e.key == Key.Enter || e.key == Key.NumPadEnter)
+                ) {
+                    pendingOpen = false
+                    focusButtons()
+                    return@onPreviewKeyEvent true
+                }
                 if (!boxFocused || dialog.isNotEmpty() || e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                 val repeat = e.nativeKeyEvent.repeatCount
                 val step = if (repeat > 6) 30_000L else 10_000L
@@ -493,9 +525,9 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.MediaPlayPause -> {
                         if (numBuf.isNotEmpty() && e.key != Key.MediaPlayPause) {
                             jumpNumber()
-                        } else if (!hasMeta && e.key != Key.MediaPlayPause) {
-                            // live TV: OK opens the buttons row (Audio / Subtitles / Quality ...)
-                            focusButtons()
+                        } else if (e.key != Key.MediaPlayPause) {
+                            // OK opens the buttons row (Audio / Subtitles / Quality ...) once the key is released
+                            pendingOpen = true
                         } else {
                             if (player.isPlaying) player.pause() else player.play()
                             pv?.showController()
@@ -534,7 +566,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                         true
                     }
                     Key.Menu -> { focusButtons(); true }
-                    Key.DirectionDown -> { if (canZap) dialog = "chans" else focusButtons(); true }
+                    Key.DirectionDown -> { pv?.showController(); true }
                     else -> false
                 }
             }
@@ -547,17 +579,6 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     this.player = player
                     pv = this
                     AppPrefs.styleSubtitles(this)
-                    // lift the player's own bar (time, seek bar, settings gear) so our buttons row sits right under it
-                    val lift = (48 * c.resources.displayMetrics.density).toInt()
-                    for (name in listOf("exo_bottom_bar", "exo_progress")) {
-                        val id = c.resources.getIdentifier(name, "id", c.packageName)
-                        val v = if (id != 0) findViewById<View>(id) else null
-                        val lp = v?.layoutParams as? ViewGroup.MarginLayoutParams
-                        if (v != null && lp != null) {
-                            lp.bottomMargin += lift
-                            v.layoutParams = lp
-                        }
-                    }
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                     )
@@ -739,7 +760,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     .fillMaxWidth(if (narrow) 1f else 0.42f)
             )
         }
-        if ((overlay || dialog.isNotEmpty()) && !PipState.inPip) {
+        if (btnsOpen && !PipState.inPip) {
             Row(
                 // bottom of the screen, directly under the player's own bar with the settings gear
                 Modifier.align(Alignment.BottomEnd).padding(start = 12.dp, end = 12.dp, bottom = 6.dp)
@@ -752,13 +773,16 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     },
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                if (hasMeta) OverlayBtn("⏯ Play / Pause", Modifier.focusRequester(firstBtnFr)) {
+                    if (player.isPlaying) player.pause() else player.play()
+                }
                 if (canZap) {
                     OverlayBtn("⏮ CH") { zap(-1) }
                     OverlayBtn("CH ⏭") { zap(1) }
                     OverlayBtn("↩ Last") { lastChannel() }
                     OverlayBtn("☰ Channels") { dialog = "chans" }
                 }
-                OverlayBtn("🔊 Audio", Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
+                OverlayBtn("🔊 Audio", if (hasMeta) Modifier else Modifier.focusRequester(firstBtnFr)) { dialog = "audio" }
                 OverlayBtn("💬 Subtitles") { dialog = "subs" }
                 OverlayBtn("⚙ Quality") { dialog = "quality" }
                 if (hasMeta) OverlayBtn("⏩ " + (if (speed == 1f) "1x" else "${speed}x")) { dialog = "speed" }
@@ -864,13 +888,19 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     initialFirstVisibleItemIndex = (curIdx - 3).coerceAtLeast(0)
                 )
                 val curFr = remember { FocusRequester() }
+                var idleTick by remember { mutableStateOf(0) }
                 LaunchedEffect(Unit) {
                     delay(120)
                     runCatching { curFr.requestFocus() }
                 }
+                LaunchedEffect(idleTick) {          // close by itself after 4 s without a key press
+                    delay(4000)
+                    dialog = ""
+                }
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                     Column(
                         Modifier.fillMaxHeight().width(340.dp)
+                            .onPreviewKeyEvent { e -> if (e.type == KeyEventType.KeyDown) idleTick++; false }
                             .background(Color(0xE60E0B24)).padding(vertical = 12.dp)
                     ) {
                         Text(
