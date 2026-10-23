@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,10 +30,15 @@ data class CatOpt(val key: String, val label: String, val count: Int, val fav: B
 fun CategoryButton(
     current: String, options: List<CatOpt>, onPick: (String) -> Unit, modifier: Modifier = Modifier,
     onLongPick: ((String) -> Unit)? = null,
-    onMove: ((String, Int) -> Unit)? = null, onResetOrder: (() -> Unit)? = null
+    onMovePicked: ((Set<String>, Int) -> Unit)? = null, onResetOrder: (() -> Unit)? = null
 ) {
     var open by remember { mutableStateOf(false) }
     var editing by remember { mutableStateOf(false) }
+    var picked by remember { mutableStateOf(setOf<String>()) }
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    LaunchedEffect(options) {
+        if (editing && picked.isNotEmpty()) listState.ensureVisible(options.indexOfFirst { it.key in picked })
+    }
     val cur = options.firstOrNull { it.key == current }
     Button(
         onClick = { open = true }, modifier = modifier,
@@ -49,17 +55,25 @@ fun CategoryButton(
                     "Categories", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
-                if (onMove != null && onResetOrder != null) {
-                    OrderBar(editing, { editing = !editing }, onResetOrder)
+                if (onMovePicked != null && onResetOrder != null) {
+                    OrderBar(
+                        editing, picked.size, { editing = !editing; picked = emptySet() },
+                        { onMovePicked(picked, -1) }, { onMovePicked(picked, 1) },
+                        { picked = emptySet(); onResetOrder() }
+                    )
                 }
-                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp)) {
+                androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp), state = listState) {
                     items(options) { o ->
                         CatRow(
                             o.label, o.count, o.key == current, onLongClick = onLongPick?.let { f -> { f(o.key) } },
                             starred = if (editing) null else o.fav, onStar = onLongPick?.let { f -> { f(o.key) } },
-                            onUp = if (editing && onMove != null && !o.key.startsWith("*")) ({ onMove(o.key, -1) }) else null,
-                            onDown = if (editing && onMove != null && !o.key.startsWith("*")) ({ onMove(o.key, 1) }) else null
-                        ) { onPick(o.key); open = false }
+                            checked = if (editing && !o.key.startsWith("*")) o.key in picked else null,
+                            onCheck = { picked = if (o.key in picked) picked - o.key else picked + o.key }
+                        ) {
+                            if (editing) {
+                                if (!o.key.startsWith("*")) picked = if (o.key in picked) picked - o.key else picked + o.key
+                            } else { onPick(o.key); open = false }
+                        }
                     }
                 }
             }
