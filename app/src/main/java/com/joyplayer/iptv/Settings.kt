@@ -94,6 +94,24 @@ object AppPrefs {
     var wallpaper: Int
         get() = gi("wallpaper", 0)
         set(v) { pi("wallpaper", v) }
+    var tileBox: Int
+        get() = gi("tile_box", 0)
+        set(v) { pi("tile_box", v) }
+    var tileBorder: Int
+        get() = gi("tile_border", 0)
+        set(v) { pi("tile_border", v) }
+    var tileText: Int
+        get() = gi("tile_text", 0)
+        set(v) { pi("tile_text", v) }
+    var tileFont: Int
+        get() = gi("tile_font", 0)
+        set(v) { pi("tile_font", v) }
+    var tileTextSize: Int
+        get() = gi("tile_tsize", 1)
+        set(v) { pi("tile_tsize", v) }
+    var tileIconSize: Int
+        get() = gi("tile_isize", 1)
+        set(v) { pi("tile_isize", v) }
     var listLayout: Boolean
         get() = gi("listlayout", 0) == 1
         set(v) { pi("listlayout", if (v) 1 else 0) }
@@ -305,6 +323,7 @@ fun SettingsScreen(
         "playlist" to "📋  Change Playlist",
         "lang" to "🌐  Change Language",
         "wall" to "🖼️  Main Screen Background",
+        "tiles" to "🎨  Main Buttons Style",
         "layout" to "🔳  Change Layout",
         "hlive" to "🙈  Hide Live Categories",
         "hvod" to "🙈  Hide Vod Categories",
@@ -365,6 +384,55 @@ fun SettingsScreen(
             Lang.codes.forEachIndexed { i, c ->
                 SOpt(Lang.names[i], Lang.code == c) { Lang.set(c); dialog = "" }
             }
+        }
+        "tiles" -> SDialog("Main Buttons Style", { dialog = "" }, maxHeight = 420.dp) {
+            Tile("Live", "📺", Modifier.fillMaxWidth().height(96.dp)) {}
+            SubBlock {
+                Text("Button Color", color = Color.White, fontSize = 15.sp)
+                ColorChoices(TileStyle.boxColors, TileStyle.boxColor) { TileStyle.boxColor = it }
+            }
+            SubBlock {
+                Text("Border Color", color = Color.White, fontSize = 15.sp)
+                ColorChoices(TileStyle.borderColors, TileStyle.borderColor) { TileStyle.borderColor = it }
+            }
+            SubBlock {
+                Text("Text Color", color = Color.White, fontSize = 15.sp)
+                ColorChoices(TileStyle.textColors, TileStyle.textColor) { TileStyle.textColor = it }
+            }
+            Text("Font", color = C.Text, fontSize = 13.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TileStyle.fontNames.forEachIndexed { i, n ->
+                    Text(
+                        n, color = Color.White, fontSize = 14.sp, fontFamily = TileStyle.fontFamilies[i],
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                            .background(if (TileStyle.font == i) C.Burgundy else C.Row)
+                            .clickable { TileStyle.font = i }.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+            Text("Text size", color = C.Text, fontSize = 13.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TileStyle.sizeNames.forEachIndexed { i, n ->
+                    Text(
+                        n, color = Color.White, fontSize = 14.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                            .background(if (TileStyle.textSize == i) C.Burgundy else C.Row)
+                            .clickable { TileStyle.textSize = i }.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+            Text("Icon size", color = C.Text, fontSize = 13.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                TileStyle.sizeNames.forEachIndexed { i, n ->
+                    Text(
+                        n, color = Color.White, fontSize = 14.sp,
+                        modifier = Modifier.clip(RoundedCornerShape(16.dp))
+                            .background(if (TileStyle.iconSize == i) C.Burgundy else C.Row)
+                            .clickable { TileStyle.iconSize = i }.padding(horizontal = 12.dp, vertical = 8.dp)
+                    )
+                }
+            }
+            SOpt("Reset to default", false) { TileStyle.reset() }
         }
         "wall" -> SDialog("Choose Main Screen Background", { dialog = "" }, maxHeight = 360.dp) {
             val sel = Wallpapers.current()
