@@ -8,6 +8,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -284,12 +285,13 @@ fun NavItem(label: String, active: Boolean, onClick: () -> Unit) {
 }
 
 @Composable
-fun CatRow(label: String, count: Int, selected: Boolean, onClick: () -> Unit) {
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+fun CatRow(label: String, count: Int, selected: Boolean, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(6.dp))
             .background(if (selected) C.Burgundy else C.Row)
-            .clickable(onClick = onClick).padding(10.dp),
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick).padding(10.dp),
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(
@@ -319,12 +321,24 @@ fun LiveScreen(
     var selUrl by rememberSaveable { mutableStateOf<String?>(null) }
     val histVersion = LiveHistory.version
     val liveSortMode = AppPrefs.liveSort
-    val groups = remember(allIn, liveSortMode) {
+    var favCatSet by remember(lockScope) { mutableStateOf(AppPrefs.favCats("live", lockScope)) }
+    val groups = remember(allIn, liveSortMode, favCatSet) {
         val g = allIn.groupBy { it.group }.map { it.key to it.value.size }
-        when (liveSortMode) {
+        val sorted = when (liveSortMode) {
             1 -> g.sortedByCategory(false) { it.first }
             2 -> g.sortedByCategory(true) { it.first }
             else -> g
+        }
+        sorted.sortedByDescending { it.first in favCatSet }   // favorite categories first
+    }
+    // long press (hold OK) on a category: add / remove it from the favorite categories
+    val toggleFavCat: (String) -> Unit = { c ->
+        if (!c.startsWith("*")) {
+            favCatSet = AppPrefs.toggleFavCat("live", lockScope, c)
+            Toast.makeText(
+                ctx, Lang.tr(if (c in favCatSet) "Category added to favorites" else "Category removed from favorites"),
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
     val favCount = remember(all, favs) { all.count { it.url in favs } }
@@ -380,12 +394,12 @@ fun LiveScreen(
     }
 
     if (compact) {
-        val catOptions = remember(groups, all.size, favCount, recentCount, closed) {
+        val catOptions = remember(groups, all.size, favCount, recentCount, closed, favCatSet) {
             listOf(
                 CatOpt("*all*", "All", all.size),
                 CatOpt("*fav*", "Favorite", favCount),
                 CatOpt("*rec*", "Recently watched", recentCount)
-            ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + it.first, it.second) }
+            ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + (if (it.first in favCatSet) "⭐ " else "") + it.first, it.second) }
         }
         Column(Modifier.fillMaxSize()) {
             Row(
@@ -404,7 +418,7 @@ fun LiveScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.45f))
+                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.45f), onLongPick = toggleFavCat)
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search") }, modifier = Modifier.weight(0.55f)
@@ -438,7 +452,10 @@ fun LiveScreen(
                     item { CatRow("Favorite", favCount, cat == "*fav*") { cat = "*fav*" } }
                     item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
                     items(groups) { (g, n) ->
-                        CatRow((if (g in closed) "🔒 " else "") + g, n, cat == g) { pickCat(g) }
+                        CatRow(
+                            (if (g in closed) "🔒 " else "") + (if (g in favCatSet) "⭐ " else "") + g, n, cat == g,
+                            onLongClick = { toggleFavCat(g) }
+                        ) { pickCat(g) }
                     }
                 }
                 LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
