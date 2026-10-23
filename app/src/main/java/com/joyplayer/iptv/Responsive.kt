@@ -63,12 +63,13 @@ fun CategoryButton(
                     )
                 }
                 androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp), state = listState) {
-                    items(options) { o ->
+                    items(options, key = { it.key }) { o ->
                         CatRow(
                             o.label, o.count, o.key == current, onLongClick = onLongPick?.let { f -> { f(o.key) } },
                             starred = if (editing) null else o.fav, onStar = onLongPick?.let { f -> { f(o.key) } },
                             checked = if (editing && !o.key.startsWith("*")) o.key in picked else null,
-                            onCheck = { picked = if (o.key in picked) picked - o.key else picked + o.key }
+                            onCheck = { picked = if (o.key in picked) picked - o.key else picked + o.key },
+                            onMoveKey = if (editing && o.key in picked) ({ d -> onMovePicked?.invoke(picked, d) }) else null
                         ) {
                             if (editing) {
                                 if (!o.key.startsWith("*")) picked = if (o.key in picked) picked - o.key else picked + o.key
