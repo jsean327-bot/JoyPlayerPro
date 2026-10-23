@@ -217,7 +217,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                             )
                         )
                     }
-                    player.pause()
+                    // free the provider connection (most lines allow only one) so the TV can open the stream
+                    player.stop()
                 }
                 override fun onSessionResumed(s: CastSession, wasSuspended: Boolean) {
                     castName = s.castDevice?.friendlyName ?: "TV"
@@ -229,6 +230,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     val was = castName != null
                     castName = null
                     if (was) {
+                        player.prepare()
                         if (hasMeta && castPos > 0L) player.seekTo(castPos)
                         player.play()
                     }
