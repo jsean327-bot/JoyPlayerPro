@@ -286,7 +286,10 @@ fun NavItem(label: String, active: Boolean, onClick: () -> Unit) {
 
 @Composable
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-fun CatRow(label: String, count: Int, selected: Boolean, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+fun CatRow(
+    label: String, count: Int, selected: Boolean, onLongClick: (() -> Unit)? = null,
+    starred: Boolean? = null, onStar: (() -> Unit)? = null, onClick: () -> Unit
+) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
             .clip(RoundedCornerShape(6.dp))
@@ -298,6 +301,14 @@ fun CatRow(label: String, count: Int, selected: Boolean, onLongClick: (() -> Uni
             label, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
             fontSize = 14.sp, modifier = Modifier.weight(1f)
         )
+        if (starred != null && onStar != null) {
+            // tap the star to add / remove the whole category from the favorites
+            Text(
+                if (starred) "⭐" else "☆", fontSize = 18.sp, color = if (starred) Color(0xFFFFD54F) else Color.White,
+                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onStar)
+                    .padding(horizontal = 8.dp)
+            )
+        }
         Text("$count", color = if (selected) Color.White else C.Blue, fontSize = 14.sp)
     }
 }
@@ -402,7 +413,7 @@ fun LiveScreen(
                 CatOpt("*all*", "All", all.size),
                 CatOpt("*fav*", "Favorite", favCount),
                 CatOpt("*rec*", "Recently watched", recentCount)
-            ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + (if (it.first in favCatSet) "⭐ " else "") + it.first, it.second) }
+            ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + it.first, it.second, it.first in favCatSet) }
         }
         Column(Modifier.fillMaxSize()) {
             Row(
@@ -456,8 +467,9 @@ fun LiveScreen(
                     item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
                     items(groups) { (g, n) ->
                         CatRow(
-                            (if (g in closed) "🔒 " else "") + (if (g in favCatSet) "⭐ " else "") + g, n, cat == g,
-                            onLongClick = { toggleFavCat(g) }
+                            (if (g in closed) "🔒 " else "") + g, n, cat == g,
+                            onLongClick = { toggleFavCat(g) },
+                            starred = g in favCatSet, onStar = { toggleFavCat(g) }
                         ) { pickCat(g) }
                     }
                 }
