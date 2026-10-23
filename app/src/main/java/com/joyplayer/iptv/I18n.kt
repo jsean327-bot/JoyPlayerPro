@@ -326,6 +326,8 @@ Reset to default|إعادة الضبط|Rétablir par défaut|Restablecer|Zurück
 Extra large|كبير جداً|Très grand|Muy grande|Sehr groß|Molto grande|Muito grande|Очень большой|Çok büyük
 Category added to favorites|تمت إضافة التصنيف إلى المفضلة|Catégorie ajoutée aux favoris|Categoría añadida a favoritos|Kategorie zu Favoriten hinzugefügt|Categoria aggiunta ai preferiti|Categoria adicionada aos favoritos|Категория добавлена в избранное|Kategori favorilere eklendi
 Category removed from favorites|تمت إزالة التصنيف من المفضلة|Catégorie retirée des favoris|Categoría quitada de favoritos|Kategorie aus Favoriten entfernt|Categoria rimossa dai preferiti|Categoria removida dos favoritos|Категория удалена из избранного|Kategori favorilerden çıkarıldı
+Added to favorites|تمت الإضافة إلى المفضلة|Ajouté aux favoris|Añadido a favoritos|Zu Favoriten hinzugefügt|Aggiunto ai preferiti|Adicionado aos favoritos|Добавлено в избранное|Favorilere eklendi
+Removed from favorites|تمت الإزالة من المفضلة|Retiré des favoris|Quitado de favoritos|Aus Favoriten entfernt|Rimosso dai preferiti|Removido dos favoritos|Удалено из избранного|Favorilerden çıkarıldı
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
