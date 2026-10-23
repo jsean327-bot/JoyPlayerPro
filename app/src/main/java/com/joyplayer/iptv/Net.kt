@@ -36,12 +36,8 @@ object PlayerFactory {
     var lastDiag by mutableStateOf("")
 
     // Same HTTP stack (OkHttp) the app already uses for the playlist / account calls.
-    private val okClient = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
+    private val okClient = Http.client.newBuilder()
         .readTimeout(20, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .retryOnConnectionFailure(true)
         .build()
 
     fun create(ctx: Context): ExoPlayer {
@@ -50,8 +46,16 @@ object PlayerFactory {
                 .setUserAgent(USER_AGENTS[uaIndex.coerceIn(0, USER_AGENTS.lastIndex)])
                 .createDataSource()
         }
-        return ExoPlayer.Builder(ctx)
+        // starts playing sooner (1.5 s of picture is enough) and keeps a comfortable buffer afterwards
+        val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
+            .setBufferDurationsMs(15_000, 50_000, 1_500, 4_000)
+            .setPrioritizeTimeOverSizeThresholds(true)
+            .build()
+        val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(ctx)
+            .setEnableDecoderFallback(true)
+        return ExoPlayer.Builder(ctx, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, dataFactory)))
+            .setLoadControl(loadControl)
             .build()
     }
 
