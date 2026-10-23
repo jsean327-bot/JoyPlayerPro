@@ -88,7 +88,7 @@ object Vod {
     }
 
     private fun api(b: String): VodService =
-        Retrofit.Builder().baseUrl(b).addConverterFactory(GsonConverterFactory.create())
+        Retrofit.Builder().baseUrl(b).client(Http.client).addConverterFactory(GsonConverterFactory.create())
             .build().create(VodService::class.java)
 
     fun invalidate(listId: String) {
@@ -116,10 +116,16 @@ object Vod {
     private suspend fun fetchRemote(l: SavedList, series: Boolean): List<LibItem> {
         val b = base(l.server)
         val a = api(b)
-        val cats = if (series) a.seriesCats(l.user, l.pass) else a.movieCats(l.user, l.pass)
+        // categories and the big list are asked at the same time
+        val (cats, seriesList, movieList) = kotlinx.coroutines.coroutineScope {
+            val c = kotlinx.coroutines.async { if (series) a.seriesCats(l.user, l.pass) else a.movieCats(l.user, l.pass) }
+            val sl = kotlinx.coroutines.async { if (series) a.series(l.user, l.pass) else emptyList() }
+            val ml = kotlinx.coroutines.async { if (series) emptyList() else a.movies(l.user, l.pass) }
+            Triple(c.await(), sl.await(), ml.await())
+        }
         val names = cats.associate { it.id to (it.name ?: "Other") }
         val items = if (series) {
-            a.series(l.user, l.pass).mapNotNull { s ->
+            seriesList.mapNotNull { s ->
                 val id = s.id ?: return@mapNotNull null
                 LibItem(
                     id, s.name ?: "Series $id", s.cover?.ifBlank { null },
@@ -128,7 +134,7 @@ object Vod {
                 )
             }
         } else {
-            a.movies(l.user, l.pass).mapNotNull { m ->
+            movieList.mapNotNull { m ->
                 val id = m.id ?: return@mapNotNull null
                 LibItem(
                     id, m.name ?: "Movie $id", m.icon?.ifBlank { null },
