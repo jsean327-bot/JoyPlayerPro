@@ -1,5 +1,7 @@
 package com.joyplayer.iptv
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import com.google.gson.annotations.SerializedName
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -117,10 +119,10 @@ object Vod {
         val b = base(l.server)
         val a = api(b)
         // categories and the big list are asked at the same time
-        val (cats, seriesList, movieList) = kotlinx.coroutines.coroutineScope {
-            val c = kotlinx.coroutines.async { if (series) a.seriesCats(l.user, l.pass) else a.movieCats(l.user, l.pass) }
-            val sl = kotlinx.coroutines.async { if (series) a.series(l.user, l.pass) else emptyList() }
-            val ml = kotlinx.coroutines.async { if (series) emptyList() else a.movies(l.user, l.pass) }
+        val (cats, seriesList, movieList) = coroutineScope {
+            val c = async { if (series) a.seriesCats(l.user, l.pass) else a.movieCats(l.user, l.pass) }
+            val sl = async { if (series) a.series(l.user, l.pass) else emptyList() }
+            val ml = async { if (series) emptyList() else a.movies(l.user, l.pass) }
             Triple(c.await(), sl.await(), ml.await())
         }
         val names = cats.associate { it.id to (it.name ?: "Other") }
