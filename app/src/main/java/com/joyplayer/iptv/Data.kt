@@ -1,5 +1,7 @@
 package com.joyplayer.iptv
 
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import com.google.gson.annotations.SerializedName
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -77,9 +79,9 @@ object Xtream {
             .addConverterFactory(GsonConverterFactory.create())
             .build().create(XtreamService::class.java)
         // categories and channels are asked at the same time
-        val (catList, streams) = kotlinx.coroutines.coroutineScope {
-            val c = kotlinx.coroutines.async { api.categories(user, pass) }
-            val s = kotlinx.coroutines.async { api.live(user, pass) }
+        val (catList, streams) = coroutineScope {
+            val c = async { api.categories(user, pass) }
+            val s = async { api.live(user, pass) }
             c.await() to s.await()
         }
         val cats = catList.associate { it.id to (it.name ?: "Other") }
