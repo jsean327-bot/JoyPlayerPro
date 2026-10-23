@@ -7,6 +7,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -112,10 +113,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             ).show()
         }
     }
-    val shown = remember(vis, favs, recents, cat, query, order) {
+    val shown = remember(vis, favs, recents, cat, query, order, favCatSet) {
         val base = when (if (query.isBlank()) cat else "*all*") {
             "*all*" -> vis
-            "*fav*" -> vis.filter { it.id.toString() in favs }
+            "*fav*" -> vis.filter { it.id.toString() in favs || it.cat in favCatSet }
             "*rec*" -> recents.mapNotNull { r -> vis.firstOrNull { it.id.toString() == r } }
             else -> vis.filter { it.cat == cat }
         }.filter { query.isBlank() || it.name.contains(query, true) }
@@ -138,6 +139,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
         val k = item.id.toString()
         favs = if (k in favs) favs - k else favs + k
         store.saveFavs(key, favs)
+        android.widget.Toast.makeText(ctx, Lang.tr(if (k in favs) "Added to favorites" else "Removed from favorites"), android.widget.Toast.LENGTH_SHORT).show()
     }
 
     val current = open
@@ -151,7 +153,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
         listOf(
             CatOpt("*rec*", "Resume to Watch", recents.size),
             CatOpt("*all*", "All", vis.size),
-            CatOpt("*fav*", "Favorite", favs.size)
+            CatOpt("*fav*", "Favorite", vis.count { it.id.toString() in favs || it.cat in favCatSet })
         ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + (if (it.first in favCatSet) "⭐ " else "") + it.first, it.second) }
     }
 
@@ -257,7 +259,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                     LazyColumn {
                         item { CatRow("Resume to Watch", recents.size, cat == "*rec*") { cat = "*rec*" } }
                         item { CatRow("All", vis.size, cat == "*all*") { cat = "*all*" } }
-                        item { CatRow("Favorite", favs.size, cat == "*fav*") { cat = "*fav*" } }
+                        item { CatRow("Favorite", vis.count { it.id.toString() in favs || it.cat in favCatSet }, cat == "*fav*") { cat = "*fav*" } }
                         items(groups) { (g, n) ->
                             CatRow(
                                 (if (g in closed) "🔒 " else "") + (if (g in favCatSet) "⭐ " else "") + g, n, cat == g,
@@ -281,10 +283,12 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit) {
     Column(
-        Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E)).clickable(onClick = onClick)
+        Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
+            .combinedClickable(onLongClick = onFav, onClick = onClick)
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(Color.Black)) {
             AsyncImage(item.poster, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
@@ -306,11 +310,12 @@ fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Un
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PosterRow(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
-            .clickable(onClick = onClick).padding(8.dp),
+            .combinedClickable(onLongClick = onFav, onClick = onClick).padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
