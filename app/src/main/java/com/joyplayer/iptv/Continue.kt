@@ -32,6 +32,7 @@ import coil.compose.AsyncImage
 @Composable
 fun ContinueRow(onPlay: (Channel) -> Unit, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
+    if (!isTvDevice(ctx)) return   // phones: hidden (it was in the way); Fire TV / Android TV keep it
     ResumeStore.init(ctx)
     val ver = ResumeStore.version
     val items = remember(ver) { ResumeStore.recent(12) }
