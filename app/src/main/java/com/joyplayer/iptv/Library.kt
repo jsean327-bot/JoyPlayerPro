@@ -91,12 +91,25 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     LaunchedEffect(closed) { if (cat in closed) cat = "*all*" }
     val pickCat: (String) -> Unit = { c -> if (c in closed) pinFor = c else cat = c }
 
-    val groups = remember(all, order) {
+    var favCatSet by remember(kind, list?.id) { mutableStateOf(AppPrefs.favCats(kind, list?.id)) }
+    val groups = remember(all, order, favCatSet) {
         val g = all.groupBy { it.cat }.map { it.key to it.value.size }
-        when (order) {
+        val sorted = when (order) {
             3 -> g.sortedByCategory(false) { it.first }
             4 -> g.sortedByCategory(true) { it.first }
             else -> g
+        }
+        sorted.sortedByDescending { it.first in favCatSet }   // favorite categories first
+    }
+    // long press (hold OK) on a category: add / remove it from the favorite categories
+    val toggleFavCat: (String) -> Unit = { c ->
+        val id = list?.id
+        if (!c.startsWith("*") && id != null) {
+            favCatSet = AppPrefs.toggleFavCat(kind, id, c)
+            android.widget.Toast.makeText(
+                ctx, Lang.tr(if (c in favCatSet) "Category added to favorites" else "Category removed from favorites"),
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
         }
     }
     val shown = remember(vis, favs, recents, cat, query, order) {
@@ -134,12 +147,12 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     }
 
     val compact = rememberIsCompact()
-    val catOptions = remember(groups, vis.size, favs.size, recents.size, closed) {
+    val catOptions = remember(groups, vis.size, favs.size, recents.size, closed, favCatSet) {
         listOf(
             CatOpt("*rec*", "Resume to Watch", recents.size),
             CatOpt("*all*", "All", vis.size),
             CatOpt("*fav*", "Favorite", favs.size)
-        ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + it.first, it.second) }
+        ) + groups.map { CatOpt(it.first, (if (it.first in closed) "🔒 " else "") + (if (it.first in favCatSet) "⭐ " else "") + it.first, it.second) }
     }
 
     val sortRow: @Composable () -> Unit = {
@@ -205,7 +218,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.42f))
+                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.42f), onLongPick = toggleFavCat)
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search...") }, modifier = Modifier.weight(0.58f)
@@ -246,7 +259,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                         item { CatRow("All", vis.size, cat == "*all*") { cat = "*all*" } }
                         item { CatRow("Favorite", favs.size, cat == "*fav*") { cat = "*fav*" } }
                         items(groups) { (g, n) ->
-                            CatRow((if (g in closed) "🔒 " else "") + g, n, cat == g) { pickCat(g) }
+                            CatRow(
+                                (if (g in closed) "🔒 " else "") + (if (g in favCatSet) "⭐ " else "") + g, n, cat == g,
+                                onLongClick = { toggleFavCat(g) }
+                            ) { pickCat(g) }
                         }
                     }
                 }
