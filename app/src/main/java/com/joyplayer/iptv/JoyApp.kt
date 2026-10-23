@@ -48,6 +48,7 @@ fun JoyApp() {
     var active by remember { mutableStateOf<SavedList?>(null) }
     var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
     var screen by remember { mutableStateOf("home") }
+    var confirmExit by remember { mutableStateOf(false) }
     var playlistsFrom by remember { mutableStateOf("home") }
     var playing by remember { mutableStateOf<Channel?>(null) }
     var loading by remember { mutableStateOf(false) }
@@ -182,7 +183,9 @@ fun JoyApp() {
                     lockScope = active?.id ?: ""
                 )
             }
-            else -> HomeScreen(
+            else -> {
+              BackHandler(enabled = playing == null) { confirmExit = true }
+              HomeScreen(
                 active?.name ?: if (lists.isEmpty()) "No playlist" else "",
                 loading, error,
                 onNav = { go(it) },
@@ -194,8 +197,18 @@ fun JoyApp() {
                         ?: lists.firstOrNull()
                     if (l != null) openList(l, force = true) else toast("أضف قائمة أولاً من Change Playlist")
                 },
-                onExit = { (ctx as? Activity)?.finish() },
+                onExit = { confirmExit = true },
                 onPlay = { playing = it }
+              )
+            }
+        }
+        if (confirmExit) {
+            AlertDialog(
+                onDismissRequest = { confirmExit = false },
+                title = { Text("Exit") },
+                text = { Text("Do you want to exit the app?") },
+                confirmButton = { TextButton(onClick = { confirmExit = false; (ctx as? Activity)?.finish() }) { Text("Yes") } },
+                dismissButton = { TextButton(onClick = { confirmExit = false }) { Text("No") } }
             )
         }
         playing?.let {
