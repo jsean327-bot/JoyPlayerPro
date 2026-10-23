@@ -178,6 +178,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         }
     }
     var dialog by remember { mutableStateOf("") }
+    // Settings menu navigation: every dialog opened from another one goes back to it (Back / selecting an option)
+    val dlgStack = remember { mutableStateListOf<String>() }
+    fun dlgNav(to: String) { dlgStack.add(dialog); dialog = to }
+    fun dlgBack() { dialog = dlgStack.removeLastOrNull() ?: "" }
+    fun dlgClose() { dlgStack.clear(); dialog = "" }
     var key by remember { mutableStateOf(settings.key) }
     var auto by remember { mutableStateOf(settings.auto) }
     var lang by remember { mutableStateOf(settings.lang) }
@@ -355,6 +360,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     // Settings menu (Audio, Subtitles, Quality ...): opened with OK / Menu on the remote, or by tapping the gear
     fun openMenu() {
         pv?.showController()
+        dlgStack.clear()
         dialog = "menu"
     }
 
@@ -742,67 +748,67 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             )
         }
         when (dialog) {
-            "menu" -> PlayerDialog("Settings", { dialog = "" }) {
+            "menu" -> PlayerDialog("Settings", { dlgBack() }) {
                 if (hasMeta) Opt("⏯  Play / Pause", false) {
                     if (player.isPlaying) player.pause() else player.play()
-                    dialog = ""
+                    dlgClose()
                 }
-                Opt("🔊  Audio", false) { dialog = "audio" }
-                Opt("💬  Subtitles", false) { dialog = "subs" }
-                Opt("⚙  Quality", false) { dialog = "quality" }
-                if (hasMeta) Opt("⏩  Speed  " + (if (speed == 1f) "1x" else "${speed}x"), false) { dialog = "speed" }
-                Opt(if (sleepEnd > 0L) "😴  Sleep  ${sleepLeft}m" else "😴  Sleep", false) { dialog = "sleep" }
+                Opt("🔊  Audio", false) { dlgNav("audio") }
+                Opt("💬  Subtitles", false) { dlgNav("subs") }
+                Opt("⚙  Quality", false) { dlgNav("quality") }
+                if (hasMeta) Opt("⏩  Speed  " + (if (speed == 1f) "1x" else "${speed}x"), false) { dlgNav("speed") }
+                Opt(if (sleepEnd > 0L) "😴  Sleep  ${sleepLeft}m" else "😴  Sleep", false) { dlgNav("sleep") }
                 Opt(
                     "⤢  " + when (resizeMode) { 4 -> "Zoom"; 3 -> "Stretch"; else -> "Fit" }, false
                 ) {
                     resizeMode = when (resizeMode) { 0 -> 4; 4 -> 3; else -> 0 }
                     playerPrefs.edit().putInt("resize", resizeMode).apply()
                 }
-                Opt("🖼  PiP", false) { dialog = ""; PipState.request(ctx) }
-                if (castCtx != null) Opt("📡  Cast", false) { dialog = "cast" }
+                Opt("🖼  PiP", false) { dlgClose(); PipState.request(ctx) }
+                if (castCtx != null) Opt("📡  Cast", false) { dlgNav("cast") }
                 PlayQueue.nextAfter(ch.url)?.let { nx ->
                     if (hasMeta) Opt("⏭  Next", false) {
-                        dialog = ""
+                        dlgClose()
                         PlayMeta.map[nx.first.url] = nx.second
                         PlayQueue.play?.invoke(nx.first)
                     }
                 }
             }
-            "audio" -> PlayerDialog("Audio / Dubbing", { dialog = "" }) {
+            "audio" -> PlayerDialog("Audio / Dubbing", { dlgBack() }) {
                 val items = tracks.groups.filter { it.type == C.TRACK_TYPE_AUDIO }
                     .flatMap { g -> (0 until g.length).map { g to it } }
                 items.forEachIndexed { idx, (g, i) ->
                     Opt(trackLabel(g.getTrackFormat(i), idx + 1), g.isTrackSelected(i)) {
-                        selectTrack(player, g, i); dialog = ""
+                        selectTrack(player, g, i); dlgBack()
                     }
                 }
                 if (items.size <= 1) Text("This stream has only one audio track.", color = C.Text, fontSize = 13.sp)
             }
-            "subs" -> PlayerDialog("Subtitles", { dialog = "" }) {
+            "subs" -> PlayerDialog("Subtitles", { dlgBack() }) {
                 val items = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
                     .flatMap { g -> (0 until g.length).map { g to it } }
                 val off = items.none { (g, i) -> g.isTrackSelected(i) }
                 Opt("Off", off) {
                     player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                         .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true).build()
-                    dialog = ""
+                    dlgBack()
                 }
                 items.forEachIndexed { idx, (g, i) ->
                     Opt(trackLabel(g.getTrackFormat(i), idx + 1), g.isTrackSelected(i)) {
-                        selectTrack(player, g, i); dialog = ""
+                        selectTrack(player, g, i); dlgBack()
                     }
                 }
                 if (hasMeta) {
-                    Opt("⏱  Subtitle delay", false) { delayPending = subOffset; dialog = "subdelay" }
+                    Opt("⏱  Subtitle delay", false) { delayPending = subOffset; dlgNav("subdelay") }
                     Opt("🌐  Search online (SubDL)", false) {
-                        dialog = "online"
+                        dlgNav("online")
                         if (key.isNotBlank()) search(false)
                     }
                 } else {
                     Text("Online search works for movies and series.", color = C.Text, fontSize = 13.sp)
                 }
             }
-            "subdelay" -> PlayerDialog("Subtitle delay", { dialog = "" }) {
+            "subdelay" -> PlayerDialog("Subtitle delay", { dlgBack() }) {
                 if (subText == null) {
                     Text(
                         "Delay works with subtitles downloaded from SubDL. Load one first.",
@@ -823,26 +829,26 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         TextButton(onClick = { delayPending = 0L }) { Text("Reset") }
                         Button(
-                            onClick = { applyDelay(delayPending); dialog = "" },
+                            onClick = { applyDelay(delayPending); dlgBack() },
                             colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
                         ) { Text("OK") }
                     }
                 }
             }
             "cast" -> castCtx?.let { cc ->
-                CastDialog(cc, castName, { cc.sessionManager.endCurrentSession(true) }, { dialog = "" })
+                CastDialog(cc, castName, { cc.sessionManager.endCurrentSession(true) }, { dlgBack() })
             }
-            "speed" -> PlayerDialog("Playback speed", { dialog = "" }) {
+            "speed" -> PlayerDialog("Playback speed", { dlgBack() }) {
                 listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 1.75f, 2f).forEach { sp ->
                     Opt(if (sp == 1f) "Normal (1x)" else "${sp}x", speed == sp) {
                         speed = sp
                         player.setPlaybackParameters(PlaybackParameters(sp))
-                        dialog = ""
+                        dlgBack()
                     }
                 }
             }
             "chans" -> androidx.compose.ui.window.Dialog(
-                onDismissRequest = { dialog = "" },
+                onDismissRequest = { dlgBack() },
                 properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
             ) {
                 val chList = LiveZap.list
@@ -858,7 +864,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 }
                 LaunchedEffect(idleTick) {          // close by itself after 4 s without a key press
                     delay(4000)
-                    dialog = ""
+                    dlgBack()
                 }
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                     Column(
@@ -885,7 +891,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (isCur) C.Burgundy else Color(0x33FFFFFF))
                                         .clickable {
-                                            dialog = ""
+                                            dlgBack()
                                             if (!isCur) goTo(c, i + 1)
                                         }
                                         .padding(horizontal = 12.dp, vertical = 10.dp),
@@ -904,16 +910,16 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     }
                 }
             }
-            "sleep" -> PlayerDialog("Sleep timer", { dialog = "" }) {
-                Opt("Off", sleepEnd == 0L) { sleepEnd = 0L; dialog = "" }
+            "sleep" -> PlayerDialog("Sleep timer", { dlgBack() }) {
+                Opt("Off", sleepEnd == 0L) { sleepEnd = 0L; dlgBack() }
                 listOf(15, 30, 45, 60, 90, 120).forEach { m ->
                     Opt("$m min", false) {
                         sleepEnd = System.currentTimeMillis() + m * 60_000L
-                        dialog = ""
+                        dlgBack()
                     }
                 }
             }
-            "online" -> PlayerDialog("SubDL subtitles", { dialog = "" }) {
+            "online" -> PlayerDialog("SubDL subtitles", { dlgBack() }) {
                 if (key.isBlank()) {
                     var k by remember { mutableStateOf("") }
                     Text("Paste your SubDL API key (saved on this device only):", color = C.Text, fontSize = 13.sp)
@@ -952,7 +958,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     TextButton(onClick = { key = ""; settings.key = "" }) { Text("Change API key") }
                 }
             }
-            "quality" -> PlayerDialog("Video quality", { dialog = "" }) {
+            "quality" -> PlayerDialog("Video quality", { dlgBack() }) {
                 val vids = tracks.groups.filter { it.type == C.TRACK_TYPE_VIDEO }
                     .flatMap { g ->
                         (0 until g.length).filter { g.isTrackSupported(it) }
@@ -966,11 +972,11 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 Opt("Auto", isAuto) {
                     player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
                         .clearOverridesOfType(C.TRACK_TYPE_VIDEO).build()
-                    dialog = ""
+                    dlgBack()
                 }
                 vids.forEach { (g, i, h) ->
                     Opt(qLabel(h), g.isTrackSelected(i) && !isAuto) {
-                        selectTrack(player, g, i); dialog = ""
+                        selectTrack(player, g, i); dlgBack()
                     }
                 }
                 if (vids.size <= 1) Text("This stream offers only one quality.", color = C.Text, fontSize = 13.sp)
