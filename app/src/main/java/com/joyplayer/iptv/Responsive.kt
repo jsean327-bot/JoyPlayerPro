@@ -27,7 +27,8 @@ data class CatOpt(val key: String, val label: String, val count: Int)
 /** Category picker used on narrow (portrait) screens instead of the left-hand category pane. */
 @Composable
 fun CategoryButton(
-    current: String, options: List<CatOpt>, onPick: (String) -> Unit, modifier: Modifier = Modifier
+    current: String, options: List<CatOpt>, onPick: (String) -> Unit, modifier: Modifier = Modifier,
+    onLongPick: ((String) -> Unit)? = null
 ) {
     var open by remember { mutableStateOf(false) }
     val cur = options.firstOrNull { it.key == current }
@@ -48,7 +49,7 @@ fun CategoryButton(
                 )
                 androidx.compose.foundation.lazy.LazyColumn(Modifier.heightIn(max = 420.dp)) {
                     items(options) { o ->
-                        CatRow(o.label, o.count, o.key == current) { onPick(o.key); open = false }
+                        CatRow(o.label, o.count, o.key == current, onLongClick = onLongPick?.let { f -> { f(o.key) } }) { onPick(o.key); open = false }
                     }
                 }
             }
