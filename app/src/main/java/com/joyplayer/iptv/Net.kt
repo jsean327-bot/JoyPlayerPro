@@ -36,8 +36,12 @@ object PlayerFactory {
     var lastDiag by mutableStateOf("")
 
     // Same HTTP stack (OkHttp) the app already uses for the playlist / account calls.
-    private val okClient = Http.client.newBuilder()
+    private val okClient = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
         .build()
 
     fun create(ctx: Context): ExoPlayer {
