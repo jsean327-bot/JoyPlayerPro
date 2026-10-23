@@ -288,7 +288,8 @@ fun NavItem(label: String, active: Boolean, onClick: () -> Unit) {
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 fun CatRow(
     label: String, count: Int, selected: Boolean, onLongClick: (() -> Unit)? = null,
-    starred: Boolean? = null, onStar: (() -> Unit)? = null, onClick: () -> Unit
+    starred: Boolean? = null, onStar: (() -> Unit)? = null,
+    onUp: (() -> Unit)? = null, onDown: (() -> Unit)? = null, onClick: () -> Unit
 ) {
     Row(
         Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp)
@@ -301,7 +302,16 @@ fun CatRow(
             label, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
             fontSize = 14.sp, modifier = Modifier.weight(1f)
         )
-        if (starred != null && onStar != null) {
+        if (onUp != null && onDown != null) {
+            Text(
+                "▲", fontSize = 16.sp, color = Color.White,
+                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onUp).padding(horizontal = 10.dp)
+            )
+            Text(
+                "▼", fontSize = 16.sp, color = Color.White,
+                modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onDown).padding(horizontal = 10.dp)
+            )
+        } else if (starred != null && onStar != null) {
             // tap the star to add / remove the whole category from the favorites
             Text(
                 if (starred) "⭐" else "☆", fontSize = 18.sp, color = if (starred) Color(0xFFFFD54F) else Color.White,
@@ -333,15 +343,24 @@ fun LiveScreen(
     val histVersion = LiveHistory.version
     val liveSortMode = AppPrefs.liveSort
     var favCatSet by remember(lockScope) { mutableStateOf(AppPrefs.favCats("live", lockScope)) }
-    val groups = remember(allIn, liveSortMode, favCatSet) {
+    var catOrder by remember(lockScope) { mutableStateOf(AppPrefs.catOrder("live", lockScope)) }
+    var editCats by remember { mutableStateOf(false) }
+    val groups = remember(allIn, liveSortMode, favCatSet, catOrder) {
         val g = allIn.groupBy { it.group }.map { it.key to it.value.size }
         val sorted = when (liveSortMode) {
             1 -> g.sortedByCategory(false) { it.first }
             2 -> g.sortedByCategory(true) { it.first }
             else -> g
         }
-        sorted.sortedByDescending { it.first in favCatSet }   // favorite categories first
+        if (catOrder.isNotEmpty()) sorted.applyOrder(catOrder) { it.first }     // your own order wins
+        else sorted.sortedByDescending { it.first in favCatSet }                  // favorite categories first
     }
+    val moveCat: (String, Int) -> Unit = { c, d ->
+        val moved = moveName(groups.map { it.first }, c, d)
+        catOrder = moved
+        AppPrefs.setCatOrder("live", lockScope, moved)
+    }
+    val resetOrder: () -> Unit = { catOrder = emptyList(); AppPrefs.setCatOrder("live", lockScope, emptyList()) }
     // long press (hold OK) on a category: add / remove it from the favorite categories
     val toggleFavCat: (String) -> Unit = { c ->
         if (!c.startsWith("*")) {
@@ -432,7 +451,10 @@ fun LiveScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.45f), onLongPick = toggleFavCat)
+                CategoryButton(
+                    cat, catOptions, { pickCat(it) }, Modifier.weight(0.45f), onLongPick = toggleFavCat,
+                    onMove = moveCat, onResetOrder = resetOrder
+                )
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search") }, modifier = Modifier.weight(0.55f)
@@ -462,6 +484,7 @@ fun LiveScreen(
             }
             Row(Modifier.fillMaxSize()) {
                 LazyColumn(Modifier.weight(0.27f).fillMaxHeight().background(C.Panel)) {
+                    item { OrderBar(editCats, { editCats = !editCats }, resetOrder) }
                     item { CatRow("All", all.size, cat == "*all*") { cat = "*all*" } }
                     item { CatRow("Favorite", favCount, cat == "*fav*") { cat = "*fav*" } }
                     item { CatRow("Recently watched", recentCount, cat == "*rec*") { cat = "*rec*" } }
@@ -469,7 +492,9 @@ fun LiveScreen(
                         CatRow(
                             (if (g in closed) "🔒 " else "") + g, n, cat == g,
                             onLongClick = { toggleFavCat(g) },
-                            starred = g in favCatSet, onStar = { toggleFavCat(g) }
+                            starred = if (editCats) null else g in favCatSet, onStar = { toggleFavCat(g) },
+                            onUp = if (editCats) ({ moveCat(g, -1) }) else null,
+                            onDown = if (editCats) ({ moveCat(g, 1) }) else null
                         ) { pickCat(g) }
                     }
                 }
