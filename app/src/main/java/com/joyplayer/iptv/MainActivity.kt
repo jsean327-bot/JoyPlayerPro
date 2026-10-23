@@ -42,7 +42,9 @@ class MainActivity : ComponentActivity() {
                         (if (Lang.code == "ar") androidx.compose.ui.unit.LayoutDirection.Rtl
                          else androidx.compose.ui.unit.LayoutDirection.Ltr)
                 ) {
-                    Surface(Modifier.fillMaxSize()) { JoyApp() }
+                    Box(Modifier.fillMaxSize().wallpaper(inner = true)) {
+                        Surface(Modifier.fillMaxSize(), color = androidx.compose.ui.graphics.Color.Transparent) { JoyApp() }
+                    }
                 }
             }
         }
