@@ -318,7 +318,15 @@ fun LiveScreen(
     var query by rememberSaveable { mutableStateOf("") }
     var selUrl by rememberSaveable { mutableStateOf<String?>(null) }
     val histVersion = LiveHistory.version
-    val groups = remember(allIn) { allIn.groupBy { it.group }.map { it.key to it.value.size } }
+    val liveSortMode = AppPrefs.liveSort
+    val groups = remember(allIn, liveSortMode) {
+        val g = allIn.groupBy { it.group }.map { it.key to it.value.size }
+        when (liveSortMode) {
+            1 -> g.sortedByCategory(false) { it.first }
+            2 -> g.sortedByCategory(true) { it.first }
+            else -> g
+        }
+    }
     val favCount = remember(all, favs) { all.count { it.url in favs } }
     val recentCount = remember(all, histVersion) {
         val urls = all.asSequence().map { it.url }.toHashSet()
