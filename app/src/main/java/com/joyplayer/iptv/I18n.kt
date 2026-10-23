@@ -315,6 +315,15 @@ XMLTV link (.xml or .xml.gz)|رابط XMLTV (.xml أو .xml.gz)|Lien XMLTV (.xml
 Do you want to exit the app?|هل تريد الخروج من التطبيق؟|Voulez-vous quitter l'application ?|¿Quieres salir de la aplicación?|Möchten Sie die App beenden?|Vuoi uscire dall'app?|Deseja sair do aplicativo?|Выйти из приложения?|Uygulamadan çıkmak istiyor musunuz?
 Main Screen Background|خلفية الشاشة الرئيسية|Arrière-plan de l'écran principal|Fondo de la pantalla principal|Hintergrund des Hauptbildschirms|Sfondo della schermata principale|Plano de fundo da tela principal|Фон главного экрана|Ana ekran arka planı
 Choose Main Screen Background|اختر خلفية الشاشة الرئيسية|Choisir l'arrière-plan de l'écran principal|Elegir el fondo de la pantalla principal|Hintergrund des Hauptbildschirms wählen|Scegli lo sfondo della schermata principale|Escolher plano de fundo da tela principal|Выберите фон главного экрана|Ana ekran arka planını seçin
+Main Buttons Style|شكل الأزرار الرئيسية|Style des boutons principaux|Estilo de botones principales|Stil der Hauptschaltflächen|Stile dei pulsanti principali|Estilo dos botões principais|Стиль главных кнопок|Ana düğme stili
+Button Color|لون الزر|Couleur du bouton|Color del botón|Schaltflächenfarbe|Colore del pulsante|Cor do botão|Цвет кнопки|Düğme rengi
+Border Color|لون الإطار|Couleur de la bordure|Color del borde|Rahmenfarbe|Colore del bordo|Cor da borda|Цвет рамки|Kenarlık rengi
+Text Color|لون الخط|Couleur du texte|Color del texto|Textfarbe|Colore del testo|Cor do texto|Цвет текста|Metin rengi
+Font|نوع الخط|Police|Fuente|Schriftart|Carattere|Fonte|Шрифт|Yazı tipi
+Text size|حجم الخط|Taille du texte|Tamaño del texto|Textgröße|Dimensione del testo|Tamanho do texto|Размер текста|Metin boyutu
+Icon size|حجم الأيقونة|Taille de l'icône|Tamaño del icono|Symbolgröße|Dimensione icona|Tamanho do ícone|Размер значка|Simge boyutu
+Reset to default|إعادة الضبط|Rétablir par défaut|Restablecer|Zurücksetzen|Ripristina|Redefinir|Сбросить|Varsayılana sıfırla
+Extra large|كبير جداً|Très grand|Muy grande|Sehr groß|Molto grande|Muito grande|Очень большой|Çok büyük
 List Layout|عرض قائمة|Disposition liste|Diseño de lista|Listenansicht|Layout elenco|Layout de lista|Список|Liste görünümü
 Grid Layout|عرض شبكة|Disposition grille|Diseño de cuadrícula|Rasteransicht|Layout griglia|Layout de grade|Сетка|Izgara görünümü
 OK|موافق|OK|Aceptar|OK|OK|OK|ОК|Tamam
