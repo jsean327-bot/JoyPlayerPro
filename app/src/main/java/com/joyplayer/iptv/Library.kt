@@ -93,14 +93,29 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     val pickCat: (String) -> Unit = { c -> if (c in closed) pinFor = c else cat = c }
 
     var favCatSet by remember(kind, list?.id) { mutableStateOf(AppPrefs.favCats(kind, list?.id)) }
-    val groups = remember(all, order, favCatSet) {
+    var catOrder by remember(kind, list?.id) { mutableStateOf(AppPrefs.catOrder(kind, list?.id)) }
+    var editCats by remember { mutableStateOf(false) }
+    val groups = remember(all, order, favCatSet, catOrder) {
         val g = all.groupBy { it.cat }.map { it.key to it.value.size }
         val sorted = when (order) {
             3 -> g.sortedByCategory(false) { it.first }
             4 -> g.sortedByCategory(true) { it.first }
             else -> g
         }
-        sorted.sortedByDescending { it.first in favCatSet }   // favorite categories first
+        if (catOrder.isNotEmpty()) sorted.applyOrder(catOrder) { it.first }     // your own order wins
+        else sorted.sortedByDescending { it.first in favCatSet }                  // favorite categories first
+    }
+    val moveCat: (String, Int) -> Unit = { c, d ->
+        val id = list?.id
+        if (id != null) {
+            val moved = moveName(groups.map { it.first }, c, d)
+            catOrder = moved
+            AppPrefs.setCatOrder(kind, id, moved)
+        }
+    }
+    val resetOrder: () -> Unit = {
+        val id = list?.id
+        if (id != null) { catOrder = emptyList(); AppPrefs.setCatOrder(kind, id, emptyList()) }
     }
     // long press (hold OK) on a category: add / remove it from the favorite categories
     val toggleFavCat: (String) -> Unit = { c ->
@@ -220,7 +235,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                CategoryButton(cat, catOptions, { pickCat(it) }, Modifier.weight(0.42f), onLongPick = toggleFavCat)
+                CategoryButton(
+                    cat, catOptions, { pickCat(it) }, Modifier.weight(0.42f), onLongPick = toggleFavCat,
+                    onMove = moveCat, onResetOrder = resetOrder
+                )
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search...") }, modifier = Modifier.weight(0.58f)
@@ -257,6 +275,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                         modifier = Modifier.clickable { onNav("home") }.padding(10.dp)
                     )
                     LazyColumn {
+                        item { OrderBar(editCats, { editCats = !editCats }, resetOrder) }
                         item { CatRow("Resume to Watch", recents.size, cat == "*rec*") { cat = "*rec*" } }
                         item { CatRow("All", vis.size, cat == "*all*") { cat = "*all*" } }
                         item { CatRow("Favorite", vis.count { it.id.toString() in favs || it.cat in favCatSet }, cat == "*fav*") { cat = "*fav*" } }
@@ -264,7 +283,9 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                             CatRow(
                                 (if (g in closed) "🔒 " else "") + g, n, cat == g,
                                 onLongClick = { toggleFavCat(g) },
-                                starred = g in favCatSet, onStar = { toggleFavCat(g) }
+                                starred = if (editCats) null else g in favCatSet, onStar = { toggleFavCat(g) },
+                                onUp = if (editCats) ({ moveCat(g, -1) }) else null,
+                                onDown = if (editCats) ({ moveCat(g, 1) }) else null
                             ) { pickCat(g) }
                         }
                     }
