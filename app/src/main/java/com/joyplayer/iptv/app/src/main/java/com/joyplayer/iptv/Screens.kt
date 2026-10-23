@@ -178,12 +178,27 @@ fun Tile(label: String, icon: String, modifier: Modifier, onClick: () -> Unit) {
 
 @Composable
 fun SideBtn(label: String, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(10.dp)
+    val bc = TileStyle.borderColor
     Box(
-        modifier.clip(RoundedCornerShape(10.dp))
-            .border(1.dp, C.Burgundy, RoundedCornerShape(10.dp))
+        modifier.clip(shape)
+            .then(
+                if (TileStyle.boxColor != 0) Modifier.background(Brush.verticalGradient(TileStyle.gradient()))
+                else Modifier
+            )
+            .then(
+                if (bc != 0) Modifier.border(2.dp, Color(bc), shape)
+                else Modifier.border(1.dp, C.Burgundy, shape)
+            )
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
-    ) { Text(label, color = C.Text, fontSize = 15.sp) }
+    ) {
+        Text(
+            label, fontSize = (15f * TileStyle.scales[TileStyle.textSize]).sp,
+            color = if (TileStyle.textColor == 0) C.Text else Color(TileStyle.textColor),
+            fontFamily = TileStyle.fontFamilies[TileStyle.font]
+        )
+    }
 }
 
 @Composable
