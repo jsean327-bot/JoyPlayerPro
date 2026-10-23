@@ -52,7 +52,9 @@ object CastHelper {
     fun context(ctx: Context): CastContext? =
         runCatching { CastContext.getSharedInstance(ctx.applicationContext) }.getOrNull()
 
-    fun request(url: String, title: String, logo: String?, live: Boolean, startMs: Long): MediaLoadRequestData {
+    fun request(rawUrl: String, title: String, logo: String?, live: Boolean, startMs: Long): MediaLoadRequestData {
+        // The Chromecast receiver cannot play raw MPEG-TS live streams, but can play the HLS version of the same line
+        val url = if (live && rawUrl.substringBefore('?').lowercase().endsWith(".ts")) rawUrl.replace(Regex("\\.ts(?=\\?|$)"), ".m3u8") else rawUrl
         val md = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE)
         md.putString(MediaMetadata.KEY_TITLE, title)
         if (!logo.isNullOrBlank()) runCatching { md.addImage(WebImage(Uri.parse(logo))) }
