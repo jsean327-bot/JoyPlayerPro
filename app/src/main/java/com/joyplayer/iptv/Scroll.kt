@@ -19,7 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -75,6 +82,30 @@ fun FastScroller(
     }
 }
 
+/**
+ * Remote control: fast-forward / page-down / channel-down jump several rows at once, rewind / page-up / channel-up jump back.
+ * It simply moves the focus [steps] times, so the list scrolls along and the focus never gets lost.
+ */
+@Composable
+private fun Modifier.fastKeys(steps: Int): Modifier {
+    val fm = LocalFocusManager.current
+    val scope = rememberCoroutineScope()
+    return this.onPreviewKeyEvent { e ->
+        val dir = when (e.key) {
+            Key.MediaFastForward, Key.PageDown, Key.ChannelDown -> FocusDirection.Down
+            Key.MediaRewind, Key.PageUp, Key.ChannelUp -> FocusDirection.Up
+            else -> null
+        }
+        if (dir == null) false
+        else {
+            if (e.type == KeyEventType.KeyDown) {
+                scope.launch { repeat(steps) { fm.moveFocus(dir); kotlinx.coroutines.delay(35) } }
+            }
+            true
+        }
+    }
+}
+
 // Same name as the built-in list so existing screens get a scrollbar automatically
 @Composable
 fun LazyColumn(
@@ -90,7 +121,7 @@ fun LazyColumn(
             if (span > 0) state.firstVisibleItemIndex.toFloat() / span else 0f
         }
     }
-    Box(modifier) {
+    Box(modifier.fastKeys(8)) {
         androidx.compose.foundation.lazy.LazyColumn(
             modifier = Modifier.fillMaxSize(),
             state = state,
@@ -130,7 +161,7 @@ fun LazyVerticalGrid(
             if (span > 0) state.firstVisibleItemIndex.toFloat() / span else 0f
         }
     }
-    Box(modifier) {
+    Box(modifier.fastKeys(4)) {
         androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
             columns = columns,
             modifier = Modifier.fillMaxSize(),
