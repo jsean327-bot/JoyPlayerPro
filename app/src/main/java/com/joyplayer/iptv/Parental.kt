@@ -3,6 +3,7 @@ package com.joyplayer.iptv
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -86,8 +87,8 @@ fun CategoryPicker(
                 TextButton(onClick = { sel = sel + shown }) { Text("Select shown") }
                 TextButton(onClick = { sel = sel - shown.toSet() }) { Text("Clear shown") }
             }
-            Column(Modifier.heightIn(max = 120.dp).verticalScroll(rememberScrollState())) {
-                shown.forEach { c ->
+            LazyColumn(Modifier.heightIn(max = 170.dp)) {
+                items(shown) { c ->
                     Row(
                         Modifier.fillMaxWidth().clickable { sel = if (c in sel) sel - c else sel + c },
                         verticalAlignment = Alignment.CenterVertically
