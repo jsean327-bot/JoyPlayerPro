@@ -123,6 +123,14 @@ object AppPrefs {
     var liveSort: Int
         get() = gi("livesort", 0)
         set(v) { pi("livesort", v) }
+    /** Preferred audio language of movies / channels ("" = the file's own default). */
+    var prefAudio: String
+        get() = p?.getString("prefaudio", "ar") ?: "ar"
+        set(v) { p?.edit()?.putString("prefaudio", v)?.apply() }
+    /** Preferred subtitle language ("" = none unless the file says so). */
+    var prefSub: String
+        get() = p?.getString("prefsub", "") ?: ""
+        set(v) { p?.edit()?.putString("prefsub", v)?.apply() }
     var liveFormat: Int
         get() = gi("livefmt", 0)
         set(v) { pi("livefmt", v) }
@@ -539,6 +547,8 @@ fun SettingsScreen(
             var ac by remember { mutableStateOf(AppPrefs.autoConnect) }
             var asub by remember { mutableStateOf(subs.auto) }
             var upd by remember { mutableStateOf(AppPrefs.autoUpdate.coerceIn(0, 2)) }
+            var pAudio by remember { mutableStateOf(AppPrefs.prefAudio) }
+            var pSub by remember { mutableStateOf(AppPrefs.prefSub) }
             LayoutOpt("Auto-Update Live, Movie & Series everytime", upd == 0) { upd = 0 }
             LayoutOpt("Auto-Update Live, Movie & Series everyday", upd == 1) { upd = 1 }
             LayoutOpt("Auto-Update Live, Movie & Series after 2 days", upd == 2) { upd = 2 }
@@ -550,9 +560,21 @@ fun SettingsScreen(
                 Switch(asub, { asub = it; subs.auto = it })
                 Text("  Auto-load subtitles (movies & series)", color = Color.White, fontSize = 14.sp)
             }
+            Text("Preferred audio language", color = C.Text, fontSize = 13.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                (listOf("" to "Default") + setLangs).forEach { (code, name) ->
+                    FilterChip(pAudio.equals(code, true), { pAudio = code.lowercase() }, { Text(name) })
+                }
+            }
+            Text("Preferred subtitle language", color = C.Text, fontSize = 13.sp)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                (listOf("" to "Off") + setLangs).forEach { (code, name) ->
+                    FilterChip(pSub.equals(code, true), { pSub = code.lowercase() }, { Text(name) })
+                }
+            }
             Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(
-                    onClick = { AppPrefs.autoUpdate = upd; dialog = "" },
+                    onClick = { AppPrefs.autoUpdate = upd; AppPrefs.prefAudio = pAudio; AppPrefs.prefSub = pSub; dialog = "" },
                     colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
                     modifier = Modifier.weight(1f)
                 ) { Text("OK") }
