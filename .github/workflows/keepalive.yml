@@ -1,0 +1,20 @@
+name: Keep signing key alive
+# GitHub deletes caches that were not used for 7 days. This touches the key cache every 3 days
+# so the app keeps the same signature (otherwise updates fail with "App not installed").
+on:
+  schedule:
+    - cron: '17 5 */3 * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  keep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Touch the signing key cache
+        id: ks
+        uses: actions/cache/restore@v4
+        with:
+          path: keystore/joyplayer.jks
+          key: joyplayer-keystore-v1
+      - run: echo "key cache found = ${{ steps.ks.outputs.cache-hit }}"
