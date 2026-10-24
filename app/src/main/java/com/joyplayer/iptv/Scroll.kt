@@ -112,9 +112,9 @@ fun LazyVerticalGrid(
     contentPadding: PaddingValues = PaddingValues(0.dp),
     horizontalArrangement: Arrangement.Horizontal = Arrangement.Start,
     verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    state: androidx.compose.foundation.lazy.grid.LazyGridState = rememberLazyGridState(),
     content: LazyGridScope.() -> Unit
 ) {
-    val state = rememberLazyGridState()
     val scope = rememberCoroutineScope()
     val dir = LocalLayoutDirection.current
     val pad = PaddingValues(
