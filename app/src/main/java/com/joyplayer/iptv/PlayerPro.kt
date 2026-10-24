@@ -817,12 +817,25 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 }
                 if (hasMeta) {
                     Opt("⏱  Subtitle delay", false) { delayPending = subOffset; dlgNav("subdelay") }
+                    Opt("🔤  Subtitle font", false) { dlgNav("subfont") }
                     Opt("🌐  Search online (SubDL)", false) {
                         dlgNav("online")
                         if (key.isNotBlank()) search(false)
                     }
                 } else {
+                    Opt("🔤  Subtitle font", false) { dlgNav("subfont") }
                     Text("Online search works for movies and series.", color = C.Text, fontSize = 13.sp)
+                }
+            }
+            "subfont" -> PlayerDialog("Subtitle font", { dlgBack() }) {
+                var fontSel by remember { mutableStateOf(AppPrefs.subFont) }
+                Text("Sample: " + SubFonts.label(fontSel) + "  —  اختبار الترجمة", color = Color.White, fontSize = 15.sp)
+                SubFonts.list().forEach { e ->
+                    Opt(e.label, fontSel == e.id) {
+                        fontSel = e.id
+                        AppPrefs.subFont = e.id
+                        pv?.let { AppPrefs.styleSubtitles(it) }      // applied to the picture right away
+                    }
                 }
             }
             "subdelay" -> PlayerDialog("Subtitle delay", { dlgBack() }) {
