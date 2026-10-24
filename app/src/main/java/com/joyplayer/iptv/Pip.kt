@@ -84,9 +84,10 @@ fun PipSupport(player: ExoPlayer) {
         onDispose { act?.removeOnPictureInPictureModeChangedListener(l) }
     }
     DisposableEffect(owner, player) {
+        var wasPlaying = true      // a video the user paused stays paused when they come back
         val obs = LifecycleEventObserver { _, e ->
-            if (e == Lifecycle.Event.ON_STOP) player.pause()
-            if (e == Lifecycle.Event.ON_START) player.play()
+            if (e == Lifecycle.Event.ON_STOP) { wasPlaying = player.playWhenReady; player.pause() }
+            if (e == Lifecycle.Event.ON_START && wasPlaying) player.play()
         }
         owner.lifecycle.addObserver(obs)
         onDispose { owner.lifecycle.removeObserver(obs) }
