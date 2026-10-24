@@ -1,0 +1,48 @@
+name: Build Windows
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'windows/**'
+      - '.github/workflows/windows.yml'
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, ia32, arm64]
+    defaults:
+      run:
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install --no-audit --no-fund
+      - name: Build installer + portable (${{ matrix.arch }})
+        run: npx electron-builder --win nsis portable --${{ matrix.arch }} --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JoyPlayer-Windows-${{ matrix.arch }}
+          path: windows/dist/*.exe
+  release:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - name: Publish release (kept apart from the Android APK releases)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          ls -la out
+          gh release create "win-${{ github.run_number }}" out/*.exe --target "${{ github.sha }}" --title "JoyPlayer Windows ${{ github.run_number }}" --notes "Windows build ${{ github.run_number }}. x64 = normal 64-bit Windows (most PCs). Setup = installer, Portable = no install needed." --prerelease --latest=false
