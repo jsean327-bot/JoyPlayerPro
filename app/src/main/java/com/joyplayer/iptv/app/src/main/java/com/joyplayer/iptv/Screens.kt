@@ -70,95 +70,6 @@ class FavStore(context: Context) {
 }
 
 @Composable
-fun AppRoot() {
-    val ctx = LocalContext.current
-    val store = remember { ListStore(ctx) }
-    val favStore = remember { FavStore(ctx) }
-    var lists by remember { mutableStateOf(store.load()) }
-    var favs by remember { mutableStateOf(favStore.load()) }
-    var adding by remember { mutableStateOf(lists.isEmpty()) }
-    var active by remember { mutableStateOf<SavedList?>(null) }
-    var channels by remember { mutableStateOf<List<Channel>>(emptyList()) }
-    var screen by remember { mutableStateOf("home") }
-    var playing by remember { mutableStateOf<Channel?>(null) }
-    var loading by remember { mutableStateOf(false) }
-    var error by remember { mutableStateOf<String?>(null) }
-    val scope = rememberCoroutineScope()
-
-    LaunchedEffect(Unit) {
-        (ctx as? Activity)?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-    }
-
-    fun soon() = Toast.makeText(ctx, "soon", Toast.LENGTH_SHORT).show()
-
-    fun openList(l0: SavedList, onOk: () -> Unit = {}) {
-        scope.launch {
-            loading = true; error = null
-            try {
-                val l = SmartList.normalize(l0)
-                val res = withContext(Dispatchers.IO) {
-                    if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
-                }
-                channels = res; active = l; screen = "home"
-                onOk()
-            } catch (e: Exception) {
-                error = e.message ?: "Error"
-            }
-            loading = false
-        }
-    }
-
-    Box(Modifier.fillMaxSize()) {
-        when {
-            channels.isEmpty() && adding -> {
-                BackHandler(enabled = lists.isNotEmpty()) { adding = false; error = null }
-                AddScreen(loading, error) { l ->
-                    openList(l) { lists = lists + l; store.save(lists); adding = false }
-                }
-            }
-            channels.isEmpty() -> ListsScreen(
-                lists, loading, error,
-                onOpen = { openList(it) },
-                onDelete = { l ->
-                    lists = lists.filter { it.id != l.id }
-                    store.save(lists)
-                    if (lists.isEmpty()) adding = true
-                },
-                onAdd = { error = null; adding = true }
-            )
-            screen == "movies" || screen == "series" -> {
-                BackHandler(enabled = playing == null) { screen = "home" }
-                LibraryScreen(screen, active, { screen = it }, { playing = it })
-            }
-            screen == "live" -> {
-                BackHandler(enabled = playing == null) { screen = "home" }
-                LiveScreen(
-                    channels, favs, playing != null,
-                    onFav = { c ->
-                        favs = if (c.url in favs) favs - c.url else favs + c.url
-                        favStore.save(favs)
-                    },
-                    onNav = { screen = it },
-                    onFull = { playing = it }
-                )
-            }
-            else -> {
-                BackHandler(enabled = playing == null) { channels = emptyList() }
-                HomeScreen(
-                    active?.name ?: "", loading, error,
-                    onNav = { screen = it },
-                    onSoon = { soon() },
-                    onChange = { channels = emptyList(); adding = false; error = null },
-                    onReload = { active?.let { openList(it) } },
-                    onExit = { (ctx as? Activity)?.finish() }
-                )
-            }
-        }
-        playing?.let { PlayerScreen(it) { playing = null } }
-    }
-}
-
-@Composable
 fun Tile(label: String, icon: String, modifier: Modifier, onClick: () -> Unit) {
     val shape = RoundedCornerShape(10.dp)
     val bc = TileStyle.borderColor
@@ -232,7 +143,6 @@ fun HomeScreen(
             ) {
                 Text("JoyPlayer", fontSize = 34.sp, color = C.Blue, fontWeight = FontWeight.Bold)
                 Text("IPTV PRO", fontSize = 12.sp, color = C.Burgundy, fontWeight = FontWeight.Bold)
-                ContinueRow(onPlay, Modifier.fillMaxWidth())
                 Tile("Live", "📺", Modifier.fillMaxWidth().height(120.dp).focusRequester(liveFocus)) { onNav("live") }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("Movies", "🎬", Modifier.weight(1f).height(100.dp)) { onNav("movies") }
@@ -275,7 +185,6 @@ fun HomeScreen(
             }
             if (androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp >= 480) {
                 Spacer(Modifier.height(16.dp))
-                ContinueRow(onPlay, Modifier.fillMaxWidth())
             }
         }
         error?.let {
