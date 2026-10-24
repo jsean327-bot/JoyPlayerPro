@@ -15,39 +15,6 @@ data class Channel(
     val tvgId: String? = null
 )
 
-object M3uParser {
-    private val attr = Regex("""([\w-]+)="([^"]*)"""")
-
-    fun parse(text: String): List<Channel> {
-        val out = mutableListOf<Channel>()
-        var name = ""; var logo: String? = null; var group = "Other"
-        for (raw in text.lineSequence()) {
-            val line = raw.trim()
-            when {
-                line.startsWith("#EXTINF") -> {
-                    val a = attr.findAll(line).associate { it.groupValues[1].lowercase() to it.groupValues[2] }
-                    logo = a["tvg-logo"]?.ifBlank { null }
-                    group = a["group-title"]?.ifBlank { null } ?: "Other"
-                    name = line.substringAfterLast(",").trim().ifBlank { a["tvg-name"] ?: "Channel" }
-                }
-                line.isNotEmpty() && !line.startsWith("#") -> {
-                    out += Channel(name.ifBlank { "Channel" }, line, logo, group)
-                    name = ""; logo = null; group = "Other"
-                }
-            }
-        }
-        return out
-    }
-
-    fun fetch(url: String): List<Channel> {
-        val req = Request.Builder().url(url).header("User-Agent", "JoyPlayer/1.0").build()
-        Http.client.newCall(req).execute().use { r ->
-            if (!r.isSuccessful) error("HTTP ${r.code}")
-            return parse(r.body?.string().orEmpty())
-        }
-    }
-}
-
 data class XCategory(@SerializedName("category_id") val id: String?, @SerializedName("category_name") val name: String?)
 data class XLive(
     val name: String?,
