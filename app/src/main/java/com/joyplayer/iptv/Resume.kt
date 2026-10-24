@@ -51,7 +51,7 @@ object ResumeStore {
 
     fun isDone(url: String): Boolean = read(url)?.done == true
 
-    fun save(url: String, pos: Long, dur: Long, name: String = "", logo: String? = null) {
+    fun save(url: String, pos: Long, dur: Long, name: String = "", logo: String? = null, notify: Boolean = true) {
         val pr = prefs ?: return
         if (dur <= 0L || pos < 0L) return
         val now = System.currentTimeMillis()
@@ -66,7 +66,7 @@ object ResumeStore {
             else -> return
         }
         prune(pr)
-        version++
+        if (notify) version++
     }
 
     class Recent(val url: String, val name: String, val logo: String?, val pos: Long, val dur: Long)
