@@ -277,9 +277,12 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             val c = WindowCompat.getInsetsController(win, win.decorView)
             c.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             c.hide(WindowInsetsCompat.Type.systemBars())
+            WindowCompat.setDecorFitsSystemWindows(win, false)     // draw under the notch / bars: no side strip
             if (Build.VERSION.SDK_INT >= 28) {
                 val lp = win.attributes
-                lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                lp.layoutInDisplayCutoutMode =
+                    if (Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 win.attributes = lp
             }
         }
@@ -287,6 +290,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             if (win != null) {
                 win.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 WindowCompat.getInsetsController(win, win.decorView).show(WindowInsetsCompat.Type.systemBars())
+                WindowCompat.setDecorFitsSystemWindows(win, true)
                 if (Build.VERSION.SDK_INT >= 28) {
                     val lp = win.attributes
                     lp.layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
