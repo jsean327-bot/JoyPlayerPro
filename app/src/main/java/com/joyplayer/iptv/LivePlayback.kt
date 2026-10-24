@@ -49,7 +49,9 @@ fun rememberLivePlayer(sel: Channel?, paused: Boolean): ExoPlayer {
             }
         }
         player.addListener(l)
+        val detach = LiveRecover.attach(player)
         onDispose {
+            detach()
             player.removeListener(l)
             if (SharedLive.player === player) {
                 SharedLive.player = null
