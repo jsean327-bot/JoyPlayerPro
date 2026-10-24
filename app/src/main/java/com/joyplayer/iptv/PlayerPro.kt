@@ -423,7 +423,9 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             }
         }
         player.addListener(l)
+        val detach = if (!hasMeta && shared == null) LiveRecover.attach(player) else null
         onDispose {
+            detach?.invoke()
             player.removeListener(l)
             if (hasMeta && shared == null) ResumeStore.save(ch.url, player.currentPosition, player.duration, ch.name, ch.logo)
             if (shared == null) player.release() else SharedLive.restorePreview()
@@ -745,6 +747,13 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     Modifier.align(Alignment.Center)
                 )
             }
+        }
+        if (PlayerFactory.reconnecting > 0 && !PipState.inPip) {
+            Text(
+                "جاري إعادة الاتصال…  (" + PlayerFactory.reconnecting + ")", color = Color.White, fontSize = 16.sp,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 70.dp)
+                    .clip(RoundedCornerShape(12.dp)).background(Color(0xAA000000)).padding(horizontal = 16.dp, vertical = 8.dp)
+            )
         }
         val diag = PlayerFactory.lastDiag
         if (diag.isNotEmpty() && !PipState.inPip) {
