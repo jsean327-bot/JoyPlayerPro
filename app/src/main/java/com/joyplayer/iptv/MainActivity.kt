@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Lang.init(this)
+        AiConfig.init(this)
         CrashLog.install(this)
         // images (logos, posters): bigger memory + disk cache, lighter bitmaps, no fade (smoother lists)
         coil.Coil.setImageLoader(
