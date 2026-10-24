@@ -81,6 +81,10 @@ object AppPrefs {
             else -> android.graphics.Color.WHITE
         }
         set(v) { pi("subfg", v) }
+    /** Subtitle font id (see SubFonts): "default", "fam:<family>:<style>" or "file:<path>". */
+    var subFont: String
+        get() = p?.getString("subfont", "default") ?: "default"
+        set(v) { p?.edit()?.putString("subfont", v)?.apply() }
     var subBg: Int
         get() = if (p?.contains("subbg") == true) gi("subbg", 0)
         else if (subBox) android.graphics.Color.argb(170, 0, 0, 0) else android.graphics.Color.TRANSPARENT
@@ -193,7 +197,7 @@ object AppPrefs {
         sv.setStyle(
             CaptionStyleCompat(
                 fg, bg, android.graphics.Color.TRANSPARENT,
-                CaptionStyleCompat.EDGE_TYPE_OUTLINE, android.graphics.Color.BLACK, null
+                CaptionStyleCompat.EDGE_TYPE_OUTLINE, android.graphics.Color.BLACK, SubFonts.typeface(subFont)
             )
         )
     }
@@ -557,13 +561,14 @@ fun SettingsScreen(
                 ) { Text("Cancel") }
             }
         }
-        "sub" -> SDialog("Subtitle Settings", { dialog = "" }, maxHeight = 460.dp) {
+        "sub" -> SDialog("Subtitle Settings", { dialog = "" }, maxHeight = 560.dp) {
             var enabled by remember { mutableStateOf(AppPrefs.subEnabled) }
             var px by remember { mutableStateOf(AppPrefs.subPx.toFloat()) }
             var fg by remember { mutableStateOf(AppPrefs.subFg) }
             var bg by remember { mutableStateOf(AppPrefs.subBg) }
             var lang by remember { mutableStateOf(subs.lang) }
             var key by remember { mutableStateOf(subs.key) }
+            var font by remember { mutableStateOf(AppPrefs.subFont) }
             SubBlock {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Enable Subtitle", color = Color.White, fontSize = 15.sp, modifier = Modifier.weight(1f))
@@ -588,12 +593,39 @@ fun SettingsScreen(
                 Text("Subtitle Background", color = Color.White, fontSize = 15.sp)
                 ColorChoices(subBgColors, bg) { bg = it }
             }
+            SubBlock {
+                Text("Subtitle Font:  " + SubFonts.label(font), color = Color.White, fontSize = 15.sp)
+                androidx.compose.foundation.lazy.LazyColumn(
+                    Modifier.fillMaxWidth().height(190.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    SubFonts.list().forEach { e ->
+                        item(key = e.id) {
+                            val fam = remember(e.id) { SubFonts.typeface(e.id)?.let { androidx.compose.ui.text.font.FontFamily(it) } }
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(6.dp))
+                                    .background(if (font == e.id) C.Burgundy else C.BurgundyDark)
+                                    .clickable { font = e.id }.padding(horizontal = 10.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                androidx.compose.material3.Text(
+                                    e.label, color = Color.White, fontSize = 16.sp,
+                                    fontFamily = fam, modifier = Modifier.weight(1f)
+                                )
+                                if (font == e.id) Text("✓", color = Color.White)
+                            }
+                        }
+                    }
+                }
+            }
             Box(
                 Modifier.fillMaxWidth().height(110.dp).clip(RoundedCornerShape(6.dp)).background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    "Subtitle Test", color = Color(fg), fontSize = (px * 0.6f).sp, fontWeight = FontWeight.Bold,
+                val prevFam = remember(font) { SubFonts.typeface(font)?.let { androidx.compose.ui.text.font.FontFamily(it) } }
+                androidx.compose.material3.Text(
+                    "Subtitle Test  —  اختبار الترجمة", color = Color(fg), fontSize = (px * 0.6f).sp,
+                    fontWeight = if (font == "default") FontWeight.Bold else null, fontFamily = prevFam,
                     modifier = Modifier.background(Color(bg)).padding(horizontal = 8.dp, vertical = 2.dp)
                 )
             }
@@ -612,6 +644,7 @@ fun SettingsScreen(
                         AppPrefs.subPx = px.toInt()
                         AppPrefs.subFg = fg
                         AppPrefs.subBg = bg
+                        AppPrefs.subFont = font
                         subs.lang = lang
                         if (key.trim() != subs.key) subs.key = key
                         dialog = ""
