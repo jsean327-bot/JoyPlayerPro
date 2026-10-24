@@ -158,7 +158,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     LaunchedEffect(player) {
         while (true) {
             delay(5000)
-            if (hasMeta && shared == null && player.isPlaying) ResumeStore.save(ch.url, player.currentPosition, player.duration, ch.name, ch.logo)
+            if (hasMeta && shared == null && player.isPlaying) ResumeStore.save(ch.url, player.currentPosition, player.duration, ch.name, ch.logo, notify = false)
         }
     }
     PipSupport(player)
