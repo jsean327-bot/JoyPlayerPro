@@ -29,7 +29,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -208,11 +211,17 @@ fun JoyApp() {
             }
         }
         if (confirmExit) {
+            // the cursor starts on "Yes"
+            val yesFocus = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                delay(250)
+                runCatching { yesFocus.requestFocus() }
+            }
             AlertDialog(
                 onDismissRequest = { confirmExit = false },
                 title = { Text("Exit") },
                 text = { Text("Do you want to exit the app?") },
-                confirmButton = { TextButton(onClick = { confirmExit = false; (ctx as? Activity)?.finish() }) { Text("Yes") } },
+                confirmButton = { TextButton(onClick = { confirmExit = false; (ctx as? Activity)?.finish() }, modifier = Modifier.focusRequester(yesFocus)) { Text("Yes") } },
                 dismissButton = { TextButton(onClick = { confirmExit = false }) { Text("No") } }
             )
         }
