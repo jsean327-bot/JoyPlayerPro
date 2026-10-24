@@ -176,6 +176,27 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     LaunchedEffect(query) {
         if (query.isBlank()) qd = "" else { kotlinx.coroutines.delay(250); qd = query }
     }
+    // AI search: the AI proposes titles / keywords for a free-text request; items matching any of them are added to the results
+    var aiTerms by remember { mutableStateOf<List<String>>(emptyList()) }
+    var aiBusy by remember { mutableStateOf(false) }
+    val aiScope = rememberCoroutineScope()
+    val aiCtx = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(query) { aiTerms = emptyList() }
+    fun runAi() {
+        if (aiBusy || query.isBlank()) return
+        aiBusy = true
+        aiScope.launch {
+            try {
+                aiTerms = Ai.searchTerms(query)
+                if (aiTerms.isEmpty()) android.widget.Toast.makeText(aiCtx, "No AI suggestions", android.widget.Toast.LENGTH_SHORT).show()
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                android.widget.Toast.makeText(aiCtx, e.message ?: "AI error", android.widget.Toast.LENGTH_LONG).show()
+            }
+            aiBusy = false
+        }
+    }
     val index by produceState(emptyMap<Int, String>(), vis) {
         value = withContext(Dispatchers.Default) {
             val m = HashMap<Int, String>(vis.size * 2)
@@ -184,9 +205,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
         }
     }
     // filtering and sorting run in the background, so typing and scrolling never freeze
-    val shown by produceState(emptyList<LibItem>(), vis, favs, recents, cat, qd, order, favCatSet, index) {
+    val shown by produceState(emptyList<LibItem>(), vis, favs, recents, cat, qd, order, favCatSet, index, aiTerms) {
         value = withContext(Dispatchers.Default) {
             val words = normSearch(qd).split(' ').filter { it.isNotBlank() }
+            val aiN = aiTerms.map { normSearch(it) }.filter { it.length >= 3 }
             val base = when (if (qd.isBlank()) cat else "*all*") {
                 "*all*" -> vis
                 "*fav*" -> vis.filter { it.id.toString() in favs || it.cat in favCatSet }
@@ -194,7 +216,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 else -> vis.filter { it.cat == cat }
             }.let { b ->
                 if (words.isEmpty()) b
-                else b.filter { x -> val n = index[x.id] ?: normSearch(x.name); words.all { w -> n.contains(w) } }
+                else b.filter { x -> val n = index[x.id] ?: normSearch(x.name); words.all { w -> n.contains(w) } || aiN.any { t -> n.contains(t) } }
             }
             when (order) {
                 1 -> base.sortedByDescending { it.added }
@@ -333,6 +355,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search...") }, modifier = Modifier.weight(0.58f)
                 )
+                if (AiConfig.enabled && query.isNotBlank()) TextButton({ runAi() }) { Text(if (aiBusy) "…" else "🤖") }
             }
             sortRow()
             Box(Modifier.weight(1f).fillMaxWidth()) { gridArea() }
@@ -352,6 +375,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                     query, { query = it }, singleLine = true,
                     placeholder = { Text("Search...") }, modifier = Modifier.width(240.dp)
                 )
+                if (AiConfig.enabled && query.isNotBlank()) TextButton({ runAi() }) { Text(if (aiBusy) "…" else "🤖 AI") }
             }
             Row(Modifier.fillMaxSize()) {
                 Column(Modifier.weight(0.30f).fillMaxHeight().background(Color(0x33000000)).padding(6.dp)) {
