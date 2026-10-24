@@ -62,6 +62,13 @@ object ContentCache {
         }
     }
 
+    /** True when the stored copy is still younger than the "Automatic" setting (0 = never fresh: refresh every session). */
+    fun isFresh(kind: String, l: SavedList): Boolean {
+        val f = file(kind, l) ?: return false
+        val max = maxAgeMs()
+        return f.exists() && max > 0L && System.currentTimeMillis() - f.lastModified() <= max
+    }
+
     fun channels(l: SavedList, ignoreAge: Boolean = false): List<Channel>? =
         read<List<Channel>>("live", l, chType, ignoreAge)?.takeIf { it.isNotEmpty() }
 
