@@ -80,9 +80,13 @@ fun JoyApp() {
                 if (force) {
                     ContentCache.clear(l.id)
                     Vod.invalidate(l.id)
+                    Preload.reset(l.id)
                 }
                 val res = withContext(Dispatchers.IO) {
-                    ContentCache.channels(l) ?: try {
+                    // saved copy first (instant); if it is stale it is refreshed quietly in the background
+                    (if (force) null else ContentCache.channels(l, ignoreAge = true))?.also {
+                        if (!ContentCache.isFresh("live", l)) Preload.refreshLive(l)
+                    } ?: try {
                         val fresh =
                             if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
                         ContentCache.putChannels(l, fresh)
@@ -96,6 +100,7 @@ fun JoyApp() {
                     }
                 }
                 channels = res; active = l
+                Preload.vod(l)
                 XmlTv.activeUrl = AppPrefs.epgUrl(l.id)
                 prefs.edit().putString("last", l0.id).apply()
                 onOk()
