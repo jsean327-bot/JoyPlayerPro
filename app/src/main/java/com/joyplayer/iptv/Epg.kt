@@ -42,7 +42,7 @@ object Epg {
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
-    private val cache = HashMap<String, Pair<Long, List<EpgItem>>>()
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, Pair<Long, List<EpgItem>>>()
     private val rx = Regex("""^(https?://[^/]+/)(?:live/)?([^/]+)/([^/]+)/(\d+)(?:\.\w+)?(?:\?.*)?$""")
 
     private fun enc(s: String) = URLEncoder.encode(s, "UTF-8")
