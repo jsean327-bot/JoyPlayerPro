@@ -212,6 +212,12 @@ fun HomeScreen(
     onPlay: (Channel) -> Unit = {}
 ) {
     val compact = rememberIsCompact()
+    // the cursor starts on "Live"
+    val liveFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        delay(300)
+        runCatching { liveFocus.requestFocus() }
+    }
     Box(Modifier.fillMaxSize().wallpaper()) {
         Column(Modifier.align(Alignment.TopEnd).padding(16.dp), horizontalAlignment = Alignment.End) {
             Text(if (loading) "Loading..." else listName, color = C.Text)
@@ -227,7 +233,7 @@ fun HomeScreen(
                 Text("JoyPlayer", fontSize = 34.sp, color = C.Blue, fontWeight = FontWeight.Bold)
                 Text("IPTV PRO", fontSize = 12.sp, color = C.Burgundy, fontWeight = FontWeight.Bold)
                 ContinueRow(onPlay, Modifier.fillMaxWidth())
-                Tile("Live", "📺", Modifier.fillMaxWidth().height(120.dp)) { onNav("live") }
+                Tile("Live", "📺", Modifier.fillMaxWidth().height(120.dp).focusRequester(liveFocus)) { onNav("live") }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Tile("Movies", "🎬", Modifier.weight(1f).height(100.dp)) { onNav("movies") }
                     Tile("Series", "🎞️", Modifier.weight(1f).height(100.dp)) { onNav("series") }
@@ -250,7 +256,7 @@ fun HomeScreen(
             Text("IPTV PRO", fontSize = 12.sp, color = C.Burgundy, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth().height(200.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Tile("Live", "📺", Modifier.weight(1.6f).fillMaxHeight()) { onNav("live") }
+                Tile("Live", "📺", Modifier.weight(1.6f).fillMaxHeight().focusRequester(liveFocus)) { onNav("live") }
                 Column(Modifier.weight(2f).fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Tile("Movies", "🎬", Modifier.weight(1f).fillMaxHeight()) { onNav("movies") }
