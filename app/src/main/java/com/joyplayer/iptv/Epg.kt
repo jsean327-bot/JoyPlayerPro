@@ -34,7 +34,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
-data class EpgItem(val title: String, val desc: String, val start: Long, val end: Long)
+data class EpgItem(val title: String, val desc: String, val start: Long, val end: Long, val startStr: String = "")
 
 /** Program guide (EPG) for Xtream live channels, read from the server's get_short_epg. */
 object Epg {
@@ -59,6 +59,49 @@ object Epg {
         } catch (e: Exception) {
             s.trim()
         }
+    }
+
+    /** Whole guide of one channel: past programs (catch-up window) and the coming days. */
+    suspend fun loadFull(url: String): List<EpgItem> = withContext(Dispatchers.IO) {
+        val m = rx.find(url) ?: return@withContext emptyList()
+        val (base, user, pass, id) = m.destructured
+        val key = "full$base$id"
+        val now = System.currentTimeMillis()
+        cache[key]?.let { (t, list) -> if (now - t < 5 * 60_000L) return@withContext list }
+        try {
+            val req = Request.Builder().url(
+                "${base}player_api.php?username=${enc(user)}&password=${enc(pass)}" +
+                        "&action=get_simple_data_table&stream_id=$id"
+            ).header("User-Agent", "VLC/3.0.18 LibVLC/3.0.18").build()
+            http.newBuilder().readTimeout(20, TimeUnit.SECONDS).build().newCall(req).execute().use { r ->
+                if (!r.isSuccessful) return@withContext emptyList()
+                val arr = JsonParser.parseString(r.body?.string().orEmpty()).asJsonObject.getAsJsonArray("epg_listings")
+                    ?: return@withContext emptyList()
+                val list = arr.mapNotNull { e ->
+                    val o = e.asJsonObject
+                    val st = o.str("start_timestamp").toLongOrNull() ?: return@mapNotNull null
+                    val en = o.str("stop_timestamp").toLongOrNull() ?: return@mapNotNull null
+                    EpgItem(dec(o.str("title")), dec(o.str("description")), st, en, o.str("start"))
+                }.sortedBy { it.start }
+                if (list.isNotEmpty()) cache[key] = now to list
+                list
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /** Catch-up (timeshift) link of a past program, in the usual Xtream form. Uses the server's own clock text for the start. */
+    fun catchupUrl(liveUrl: String, p: EpgItem): String? {
+        val m = rx.find(liveUrl) ?: return null
+        val (base, user, pass, id) = m.destructured
+        val minutes = ((p.end - p.start) / 60L).coerceAtLeast(1L) + 1L
+        val st = if (p.startStr.length >= 16) {
+            p.startStr.substring(0, 16).replace(' ', ':').let { it.substring(0, 13) + "-" + it.substring(14) }
+        } else {
+            SimpleDateFormat("yyyy-MM-dd:HH-mm", Locale.US).format(Date(p.start * 1000))
+        }
+        return "${base}timeshift/$user/$pass/$minutes/$st/$id.ts"
     }
 
     suspend fun load(url: String): List<EpgItem> = withContext(Dispatchers.IO) {
@@ -114,7 +157,7 @@ private fun fmtT(sec: Long): String =
 
 /** Now / Next block shown under the channel name in the Live preview pane. */
 @Composable
-fun EpgInfo(ch: Channel?) {
+fun EpgInfo(ch: Channel?, onPlay: (Channel) -> Unit = {}) {
     if (ch == null) return
     val items = rememberEpg(ch)
     val now = rememberEpgNow()
@@ -148,24 +191,15 @@ fun EpgInfo(ch: Channel?) {
                 }
             }
         }
-        if (!items.isNullOrEmpty()) {
+        if (!items.isNullOrEmpty() || ch.archiveDays > 0) {
             Text(
-                "📅  Program Guide", color = C.Blue, fontSize = 13.sp,
+                "📅  Program Guide" + if (ch.archiveDays > 0) "  ⏪" else "", color = C.Blue, fontSize = 13.sp,
                 modifier = Modifier.clickable { guide = true }.padding(vertical = 6.dp)
             )
         }
     }
 
-    if (guide && !items.isNullOrEmpty()) {
-        SDialog(ch.name, { guide = false }) {
-            cur?.desc?.takeIf { it.isNotBlank() }?.let {
-                Text(it, color = C.Text, fontSize = 13.sp)
-            }
-            items.forEach { p ->
-                SOpt("${fmtT(p.start)} - ${fmtT(p.end)}   ${p.title}", p === cur) { }
-            }
-        }
-    }
+    if (guide) ProgramGuideDialog(ch, items.orEmpty(), onPlay) { guide = false }
 }
 
 /** Small Now / Next label over the fullscreen live player. */
