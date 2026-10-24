@@ -35,6 +35,9 @@ object PlayerFactory {
     /** Text describing the last failed stream (shown over the fullscreen player). */
     var lastDiag by mutableStateOf("")
 
+    /** > 0 while a live stream is being reconnected automatically (number of the attempt). */
+    var reconnecting by mutableStateOf(0)
+
     // Same HTTP stack (OkHttp) the app already uses for the playlist / account calls.
     private val okClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -60,10 +63,20 @@ object PlayerFactory {
             .build()
         val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(ctx)
             .setEnableDecoderFallback(true)
-        return ExoPlayer.Builder(ctx, renderers)
+        val player = ExoPlayer.Builder(ctx, renderers)
             .setMediaSourceFactory(DefaultMediaSourceFactory(DefaultDataSource.Factory(ctx, dataFactory)))
             .setLoadControl(loadControl)
             .build()
+        // preferred audio / subtitle language (Settings > Automatic)
+        val pa = AppPrefs.prefAudio
+        val ps = AppPrefs.prefSub
+        if (pa.isNotBlank() || ps.isNotBlank()) {
+            player.trackSelectionParameters = player.trackSelectionParameters.buildUpon().apply {
+                if (pa.isNotBlank()) setPreferredAudioLanguage(pa)
+                if (ps.isNotBlank()) setPreferredTextLanguage(ps)
+            }.build()
+        }
+        return player
     }
 
     private val liveRx = Regex("""^(https?://[^/]+)/(?:live/)?([^/]+)/([^/]+)/(\d+)(?:\.\w+)?$""")
@@ -122,7 +135,7 @@ object PlayerFactory {
         }
         if (io && r != null && r.next(player, error)) return
         val extra = if (lastDiag.isNotEmpty()) "  (details on the fullscreen player)" else ""
-        Toast.makeText(ctx, "Playback failed: ${describe(error)}$extra", Toast.LENGTH_LONG).show()
+        if (reconnecting == 0) Toast.makeText(ctx, "Playback failed: ${describe(error)}$extra", Toast.LENGTH_LONG).show()
     }
 }
 
