@@ -424,6 +424,11 @@ fun LiveScreen(
             runCatching { selFocus.requestFocus() }
         }
     }
+    // entering Live: the cursor starts on the channel list (the playing / first channel), not on "Home"
+    LaunchedEffect(Unit) {
+        delay(350)
+        runCatching { selFocus.requestFocus() }
+    }
     val player = rememberLivePlayer(sel, paused)
     val compact = rememberIsCompact()
     LaunchedEffect(closed) { if (cat in closed) cat = "*all*" }
@@ -504,7 +509,7 @@ fun LiveScreen(
             }
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), shownState) {
                 itemsIndexed(shown) { i, ch ->
-                    LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
+                    LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl || (selUrl == null && i == 0)) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
                 }
             }
         }
@@ -548,7 +553,7 @@ fun LiveScreen(
                 }
                 LazyColumn(Modifier.weight(0.37f).fillMaxHeight(), shownState) {
                     itemsIndexed(shown) { i, ch ->
-                        LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
+                        LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl || (selUrl == null && i == 0)) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
                     }
                 }
                 LivePane(player, sel, favs, onFav, onFull, false, Modifier.weight(0.36f).fillMaxHeight().padding(8.dp))
