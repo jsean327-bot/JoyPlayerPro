@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -114,6 +115,25 @@ fun AccountScreen(list: SavedList?, onBack: () -> Unit) {
     var error by remember(list?.id) { mutableStateOf<String?>(null) }
     var loading by remember(list?.id) { mutableStateOf(list != null) }
     var tick by remember { mutableStateOf(0) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val clip = androidx.compose.ui.platform.LocalClipboardManager.current
+    var report by remember { mutableStateOf<String?>(null) }
+    var testing by remember { mutableStateOf(false) }
+
+    if (report != null) {
+        SDialog("Connection test", { if (!testing) report = null }, maxHeight = 320.dp) {
+            Text(report ?: "", color = Color.White, fontSize = 12.sp, fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace)
+            if (testing) CircularProgressIndicator()
+            else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = {
+                    clip.setText(androidx.compose.ui.text.AnnotatedString(report ?: ""))
+                    android.widget.Toast.makeText(ctx, "Copied", android.widget.Toast.LENGTH_SHORT).show()
+                }) { Text("Copy report") }
+                Button(onClick = { report = null }) { Text("Close") }
+            }
+        }
+    }
 
     LaunchedEffect(list?.id, tick) {
         if (list == null) return@LaunchedEffect
@@ -189,6 +209,24 @@ fun AccountScreen(list: SavedList?, onBack: () -> Unit) {
                 onClick = { tick++ },
                 colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
             ) { Text("⟳  Refresh") }
+            Button(
+                onClick = {
+                    if (!testing) {
+                        testing = true; report = "…"
+                        scope.launch {
+                            try {
+                                report = Diag.run(ctx, list) { report = it }
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                throw e
+                            } catch (e: Exception) {
+                                report = "Test failed: ${e.message}"
+                            }
+                            testing = false
+                        }
+                    }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = C.Blue)
+            ) { Text("🩺  Test connection") }
         }
     }
 }
