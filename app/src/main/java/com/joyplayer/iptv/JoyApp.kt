@@ -206,7 +206,8 @@ fun JoyApp() {
                     if (l != null) openList(l, force = true) else toast("أضف قائمة أولاً من Change Playlist")
                 },
                 onExit = { confirmExit = true },
-                onPlay = { playing = it }
+                onPlay = { playing = it },
+                list = active
               )
             }
         }
