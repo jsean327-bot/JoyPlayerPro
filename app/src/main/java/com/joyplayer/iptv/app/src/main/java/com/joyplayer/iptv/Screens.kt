@@ -396,20 +396,20 @@ fun LiveScreen(
     }
     val shown = remember(all, index, favs, cat, query, histVersion, favCatSet) {
         val words = normSearch(query).split(' ').filter { it.isNotBlank() }
-        when {
-            words.isEmpty() && cat == "*rec*" -> {
+        // the search works inside the category that is open ("All" searches everything)
+        val base: List<Channel> = when (cat) {
+            "*all*" -> all
+            "*rec*" -> {
                 val byUrl = all.associateBy { it.url }
                 LiveHistory.list().mapNotNull { byUrl[it] }
             }
-            words.isEmpty() -> all.filter { c ->
-                when (cat) {
-                    "*all*" -> true
-                    "*fav*" -> c.url in favs || c.group in favCatSet
-                    else -> c.group == cat
-                }
-            }
-            index.size == all.size -> all.filterIndexed { i, _ -> words.all { w -> index[i].contains(w) } }
-            else -> all.filter { c -> words.all { w -> normSearch(c.name).contains(w) } }
+            "*fav*" -> all.filter { c -> c.url in favs || c.group in favCatSet }
+            else -> all.filter { c -> c.group == cat }
+        }
+        when {
+            words.isEmpty() -> base
+            cat == "*all*" && index.size == all.size -> all.filterIndexed { i, _ -> words.all { w -> index[i].contains(w) } }
+            else -> base.filter { c -> val n = normSearch(c.name + " " + c.group); words.all { w -> n.contains(w) } }
         }
     }
     val sel = remember(all, selUrl) { all.firstOrNull { it.url == selUrl } }
@@ -431,9 +431,30 @@ fun LiveScreen(
     val toastFav: (Boolean) -> Unit = { added ->
         Toast.makeText(ctx, Lang.tr(if (added) "Added to favorites" else "Removed from favorites"), Toast.LENGTH_SHORT).show()
     }
+    var jumpTo by remember { mutableStateOf<String?>(null) }
+    val shownState = androidx.compose.foundation.lazy.rememberLazyListState()
     val onRowClick: (Channel) -> Unit = { ch ->
-        if (ch.url == selUrl) onFull(ch) else { selUrl = ch.url; LiveHistory.push(ch.url) }
+        if (ch.url == selUrl) onFull(ch)
+        else {
+            selUrl = ch.url; LiveHistory.push(ch.url)
+            if (query.isNotBlank()) {           // picked from a search: open its whole category, channel selected
+                query = ""; cat = ch.group; jumpTo = ch.url
+            }
+        }
     }
+    LaunchedEffect(jumpTo) {
+        val u = jumpTo ?: return@LaunchedEffect
+        val idx = shown.indexOfFirst { it.url == u }
+        if (idx >= 0) {
+            runCatching { shownState.scrollToItem((idx - 2).coerceAtLeast(0)) }
+            delay(250)
+            runCatching { selFocus.requestFocus() }
+        }
+        jumpTo = null
+    }
+    // choosing another category leaves the search
+    var lastCat by remember { mutableStateOf(cat) }
+    LaunchedEffect(cat) { if (cat != lastCat) { query = ""; lastCat = cat } }
     SideEffect {
         LiveZap.list = shown
         LiveZap.all = all
@@ -477,10 +498,11 @@ fun LiveScreen(
                 )
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
-                    placeholder = { Text("Search") }, modifier = Modifier.weight(0.55f)
+                    placeholder = { Text("Search") }, modifier = Modifier.weight(0.55f),
+                    trailingIcon = { if (query.isNotEmpty()) Text("✕", color = Color.White, modifier = Modifier.clickable { query = "" }.padding(8.dp)) }
                 )
             }
-            LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+            LazyColumn(Modifier.weight(1f).fillMaxWidth(), shownState) {
                 itemsIndexed(shown) { i, ch ->
                     LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
                 }
@@ -499,7 +521,8 @@ fun LiveScreen(
                 Spacer(Modifier.weight(1f))
                 OutlinedTextField(
                     query, { query = it }, singleLine = true,
-                    placeholder = { Text("Search") }, modifier = Modifier.width(240.dp)
+                    placeholder = { Text("Search") }, modifier = Modifier.width(240.dp),
+                    trailingIcon = { if (query.isNotEmpty()) Text("✕", color = Color.White, modifier = Modifier.clickable { query = "" }.padding(8.dp)) }
                 )
             }
             Row(Modifier.fillMaxSize()) {
@@ -523,7 +546,7 @@ fun LiveScreen(
                         ) { if (editCats) togglePick(g) else pickCat(g) }
                     }
                 }
-                LazyColumn(Modifier.weight(0.37f).fillMaxHeight()) {
+                LazyColumn(Modifier.weight(0.37f).fillMaxHeight(), shownState) {
                     itemsIndexed(shown) { i, ch ->
                         LiveRow(i, ch, ch.url == selUrl, query.isNotBlank(), ch.url in favs, if (ch.url == selUrl) selFocus else null, { onFav(ch); toastFav(ch.url !in favs) }) { onRowClick(ch) }
                     }
