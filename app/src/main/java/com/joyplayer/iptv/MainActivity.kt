@@ -68,3 +68,43 @@ class MainActivity : ComponentActivity() {
         if (PipState.canEnter && PipState.isEnabled(this)) PipState.enter(this)
     }
 }
+
+@Composable
+fun AddScreen(loading: Boolean, error: String?, onSave: (SavedList) -> Unit) {
+    var tab by remember { mutableIntStateOf(0) }
+    var name by remember { mutableStateOf("") }
+    var url by remember { mutableStateOf("") }
+    var server by remember { mutableStateOf("") }
+    var user by remember { mutableStateOf("") }
+    var pass by remember { mutableStateOf("") }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
+        Text("JoyPlayer IPTV", style = MaterialTheme.typography.headlineLarge)
+        Spacer(Modifier.height(16.dp))
+        TabRow(tab) {
+            Tab(tab == 0, { tab = 0 }, text = { Text("M3U") })
+            Tab(tab == 1, { tab = 1 }, text = { Text("Xtream") })
+        }
+        Spacer(Modifier.height(16.dp))
+        OutlinedTextField(name, { name = it }, label = { Text("List name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        if (tab == 0) {
+            OutlinedTextField(url, { url = it }, label = { Text("M3U URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        } else {
+            OutlinedTextField(server, { server = it }, label = { Text("Server (http://host:port)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(user, { user = it }, label = { Text("Username") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(pass, { pass = it }, label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+        }
+        Spacer(Modifier.height(16.dp))
+        Button(
+            onClick = {
+                val id = System.currentTimeMillis().toString()
+                val n = name.trim().ifBlank { "My List" }
+                onSave(
+                    if (tab == 0) SavedList(id, n, "m3u", url = url.trim())
+                    else SavedList(id, n, "xtream", server = server.trim(), user = user.trim(), pass = pass.trim())
+                )
+            },
+            enabled = !loading, modifier = Modifier.fillMaxWidth()
+        ) { Text(if (loading) "Loading..." else "Save & Load") }
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp)) }
+    }
+}
