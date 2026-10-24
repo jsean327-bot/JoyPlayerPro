@@ -51,9 +51,12 @@ object PlayerFactory {
                 .createDataSource()
         }
         // starts playing sooner (1.5 s of picture is enough) and keeps a comfortable buffer afterwards
+        // TV boxes / Fire TV sticks have a weaker Wi-Fi and little memory: longer runway, but a capped buffer size
+        val tv = isTvDevice(ctx)
         val loadControl = androidx.media3.exoplayer.DefaultLoadControl.Builder()
-            .setBufferDurationsMs(15_000, 50_000, 1_500, 4_000)
-            .setPrioritizeTimeOverSizeThresholds(true)
+            .setBufferDurationsMs(if (tv) 30_000 else 15_000, if (tv) 90_000 else 50_000, if (tv) 2_500 else 1_500, if (tv) 6_000 else 4_000)
+            .setTargetBufferBytes(if (tv) 48 * 1024 * 1024 else -1)
+            .setPrioritizeTimeOverSizeThresholds(!tv)
             .build()
         val renderers = androidx.media3.exoplayer.DefaultRenderersFactory(ctx)
             .setEnableDecoderFallback(true)
