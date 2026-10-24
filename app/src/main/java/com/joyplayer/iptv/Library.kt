@@ -72,6 +72,16 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     LaunchedEffect(cat, query, order, key) {
         runCatching { gridState.scrollToItem(0); rowsState.scrollToItem(0) }
     }
+    // entering Movies / Series: the cursor starts on the first poster, not on "Home"
+    val firstFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    var firstDone by remember(key) { mutableStateOf(false) }
+    LaunchedEffect(loading, open) {
+        if (!loading && open == null && !firstDone && lastOpen == null) {
+            kotlinx.coroutines.delay(400)
+            runCatching { firstFocus.requestFocus() }
+            firstDone = true
+        }
+    }
     LaunchedEffect(open) {
         if (open == null && lastOpen != null) {
             kotlinx.coroutines.delay(350)
@@ -224,7 +234,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             AppPrefs.listLayout -> LazyColumn(Modifier.padding(horizontal = 12.dp), rowsState) {
                 items(shown) { item ->
                     Box(Modifier.padding(vertical = 4.dp)) {
-                        PosterRow(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else Modifier)
+                        PosterRow(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else if (item === shown.firstOrNull()) Modifier.focusRequester(firstFocus) else Modifier)
                     }
                 }
             }
@@ -236,7 +246,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 state = gridState
             ) {
                 gridItems(shown) { item ->
-                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else Modifier)
+                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else if (item === shown.firstOrNull()) Modifier.focusRequester(firstFocus) else Modifier)
                 }
             }
         }
