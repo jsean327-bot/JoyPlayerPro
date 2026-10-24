@@ -554,10 +554,10 @@ private fun LivePane(
                     ) { Text("⛶", fontSize = 16.sp) }
                 }
             }
-            EpgInfo(sel)
+            EpgInfo(sel, onFull)
         } else {
             Text(sel?.name ?: "", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2)
-            EpgInfo(sel)
+            EpgInfo(sel, onFull)
             Spacer(Modifier.weight(1f))
             if (sel != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
