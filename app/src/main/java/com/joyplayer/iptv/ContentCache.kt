@@ -77,10 +77,14 @@ object ContentCache {
     }
 
     fun vod(l: SavedList, series: Boolean, ignoreAge: Boolean = false): List<LibItem>? =
-        read<List<LibItem>>(if (series) "series" else "movies", l, vodType, ignoreAge)?.takeIf { it.isNotEmpty() }
+        read<List<LibItem>>(if (series) "series2" else "movies2", l, vodType, ignoreAge)?.takeIf { it.isNotEmpty() }
+            ?.let { list ->       // same category name = one shared string (less memory)
+                val same = HashMap<String, String>()
+                list.map { it.copy(cat = same.getOrPut(it.cat) { it.cat }) }
+            }
 
     fun putVod(l: SavedList, series: Boolean, list: List<LibItem>) {
-        if (list.isNotEmpty()) write(if (series) "series" else "movies", l, list, vodType)
+        if (list.isNotEmpty()) write(if (series) "series2" else "movies2", l, list, vodType)
     }
 
     /** Forget everything stored for one playlist (used by Reload). */
