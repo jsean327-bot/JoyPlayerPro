@@ -171,19 +171,38 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             ).show()
         }
     }
-    val shown = remember(vis, favs, recents, cat, query, order, favCatSet) {
-        val base = when (if (query.isBlank()) cat else "*all*") {
-            "*all*" -> vis
-            "*fav*" -> vis.filter { it.id.toString() in favs || it.cat in favCatSet }
-            "*rec*" -> recents.mapNotNull { r -> vis.firstOrNull { it.id.toString() == r } }
-            else -> vis.filter { it.cat == cat }
-        }.filter { query.isBlank() || it.name.contains(query, true) }
-        when (order) {
-            1 -> base.sortedByDescending { it.added }
-            2 -> base.sortedByDescending { it.rating }
-            3 -> base.sortedByTitle(false) { it.name }
-            4 -> base.sortedByTitle(true) { it.name }
-            else -> base
+    // search: typed text is used 0.25 s after the last key; words are matched without accents / hamza
+    var qd by remember { mutableStateOf("") }
+    LaunchedEffect(query) {
+        if (query.isBlank()) qd = "" else { kotlinx.coroutines.delay(250); qd = query }
+    }
+    val index by produceState(emptyMap<Int, String>(), vis) {
+        value = withContext(Dispatchers.Default) {
+            val m = HashMap<Int, String>(vis.size * 2)
+            vis.forEach { m[it.id] = normSearch(it.name) }
+            m
+        }
+    }
+    // filtering and sorting run in the background, so typing and scrolling never freeze
+    val shown by produceState(emptyList<LibItem>(), vis, favs, recents, cat, qd, order, favCatSet, index) {
+        value = withContext(Dispatchers.Default) {
+            val words = normSearch(qd).split(' ').filter { it.isNotBlank() }
+            val base = when (if (qd.isBlank()) cat else "*all*") {
+                "*all*" -> vis
+                "*fav*" -> vis.filter { it.id.toString() in favs || it.cat in favCatSet }
+                "*rec*" -> { val byId = vis.associateBy { it.id.toString() }; recents.mapNotNull { byId[it] } }
+                else -> vis.filter { it.cat == cat }
+            }.let { b ->
+                if (words.isEmpty()) b
+                else b.filter { x -> val n = index[x.id] ?: normSearch(x.name); words.all { w -> n.contains(w) } }
+            }
+            when (order) {
+                1 -> base.sortedByDescending { it.added }
+                2 -> base.sortedByDescending { it.rating }
+                3 -> base.sortedByTitle(false) { it.name }
+                4 -> base.sortedByTitle(true) { it.name }
+                else -> base
+            }
         }
     }
     val orders = listOf("Order by number", "Order by added", "Order by rating", "Order by A-Z", "Order by Z-A")
@@ -389,7 +408,7 @@ fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Un
             .combinedClickable(onLongClick = onFav, onClick = onClick)
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(Color.Black)) {
-            AsyncImage(item.poster, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            AsyncImage(item.thumb, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             Text(
                 if (fav) "★" else "☆", color = Color(0xFFFFD54F), fontSize = 20.sp,
                 modifier = Modifier.align(Alignment.TopEnd).clickable(onClick = onFav).padding(6.dp)
@@ -417,7 +436,7 @@ fun PosterRow(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Uni
         verticalAlignment = Alignment.CenterVertically
     ) {
         AsyncImage(
-            item.poster, null,
+            item.thumb, null,
             Modifier.width(56.dp).aspectRatio(2f / 3f).clip(RoundedCornerShape(6.dp)).background(Color.Black),
             contentScale = ContentScale.Crop
         )
