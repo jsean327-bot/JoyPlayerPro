@@ -32,6 +32,23 @@ object PlayerFactory {
 
     @Volatile var uaIndex = 0
 
+    private val made = java.util.concurrent.CopyOnWriteArrayList<java.lang.ref.WeakReference<ExoPlayer>>()
+
+    /** True while any player of the app is playing (checked on the main thread). */
+    private fun anyPlaying(): Boolean {
+        made.removeAll { it.get() == null }
+        return made.any { runCatching { it.get()?.isPlaying == true }.getOrDefault(false) }
+    }
+
+    /** Waits (up to ~15 min) until nothing is playing, so background downloads never steal the bandwidth of a stream. */
+    suspend fun awaitIdle() {
+        var n = 0
+        while (n < 60 && kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) { anyPlaying() }) {
+            kotlinx.coroutines.delay(15_000)
+            n++
+        }
+    }
+
     /** Text describing the last failed stream (shown over the fullscreen player). */
     var lastDiag by mutableStateOf("")
 
@@ -76,6 +93,7 @@ object PlayerFactory {
                 if (ps.isNotBlank()) setPreferredTextLanguage(ps)
             }.build()
         }
+        made.add(java.lang.ref.WeakReference(player))
         return player
     }
 
