@@ -17,6 +17,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEvent
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -32,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class LibStore(context: Context) {
@@ -69,6 +77,9 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     val rowsState = androidx.compose.foundation.lazy.rememberLazyListState()
     var lastOpen by remember(key) { mutableStateOf<String?>(null) }
     val backFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    val navScope = rememberCoroutineScope()
+    val itemReqs = remember(key) { HashMap<String, androidx.compose.ui.focus.FocusRequester>() }
+    fun reqOf(id: String) = itemReqs.getOrPut(id) { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(cat, query, order, key) {
         runCatching { gridState.scrollToItem(0); rowsState.scrollToItem(0) }
     }
@@ -245,8 +256,34 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 verticalArrangement = Arrangement.spacedBy(12.dp),
                 state = gridState
             ) {
-                gridItems(shown) { item ->
-                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else if (item === shown.firstOrNull()) Modifier.focusRequester(firstFocus) else Modifier)
+                gridItemsIndexed(shown) { index, item ->
+                    // Up / Down move to the poster straight above / below (same column), not to the next row's first one
+                    val nav = Modifier.focusRequester(reqOf(item.id.toString())).onPreviewKeyEvent { e ->
+                        if (e.type == KeyEventType.KeyDown && (e.key == Key.DirectionDown || e.key == Key.DirectionUp)) {
+                            val down = e.key == Key.DirectionDown
+                            val vis = gridState.layoutInfo.visibleItemsInfo
+                            val cols = (vis.maxOfOrNull { it.column } ?: 0) + 1
+                            var t = index + if (down) cols else -cols
+                            if (t < 0) {
+                                false                                   // first row: Up goes to the top bar as usual
+                            } else {
+                                if (t >= shown.size) t = if (index / cols < (shown.size - 1) / cols) shown.size - 1 else -1
+                                if (t >= 0) {
+                                    val target = shown[t].id.toString()
+                                    navScope.launch {
+                                        if (gridState.layoutInfo.visibleItemsInfo.none { it.index == t }) {
+                                            gridState.scrollToItem(t)
+                                            kotlinx.coroutines.delay(80)
+                                        }
+                                        runCatching { reqOf(target).requestFocus() }
+                                    }
+                                }
+                                true
+                            }
+                        } else false
+                    }
+                    val base = if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else if (item === shown.firstOrNull()) Modifier.focusRequester(firstFocus) else Modifier
+                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, base.then(nav))
                 }
             }
         }
