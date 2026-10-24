@@ -76,13 +76,31 @@ interface VodService {
     ): VSeriesInfo
 }
 
+/** p = poster link (TMDB links are stored shortened), ext = file type of a movie (the play link is built when needed). */
 data class LibItem(
-    val id: Int, val name: String, val poster: String?, val rating: Double,
-    val added: Long, val cat: String, val url: String
-)
+    val id: Int, val name: String, val p: String?, val rating: Double,
+    val added: Long, val cat: String, val ext: String? = null
+) {
+    val poster: String? get() = Posters.full(p)
+    /** Lighter picture for the small cards of the grid. */
+    val thumb: String? get() = Posters.thumb(p)
+}
+
+fun LibItem.playUrl(l: SavedList): String = Vod.baseOf(l.server) + "movie/${l.user}/${l.pass}/$id.${ext ?: "mp4"}"
+
+object Posters {
+    private const val TMDB = "https://image.tmdb.org/t/p/"
+    fun pack(u: String?): String? =
+        if (u != null && u.startsWith(TMDB)) "~" + u.substring(TMDB.length) else u
+    fun full(p: String?): String? = if (p != null && p.startsWith("~")) TMDB + p.substring(1) else p
+    fun thumb(p: String?): String? =
+        if (p != null && p.startsWith("~") && p.indexOf('/') > 0) TMDB + "w342" + p.substring(p.indexOf('/')) else full(p)
+}
 
 object Vod {
     private val cache = java.util.concurrent.ConcurrentHashMap<String, List<LibItem>>()
+
+    fun baseOf(server: String): String = base(server)
 
     private fun base(server: String): String {
         var b = server.trim()
@@ -109,6 +127,7 @@ object Vod {
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 kotlinx.coroutines.delay(20_000)   // let the screen / player settle first
+                PlayerFactory.awaitIdle()           // never compete with a stream that is playing
                 val items = fetchRemote(l, series)
                 ContentCache.putVod(l, series, items)   // used the next time the app starts
             } catch (t: Throwable) {
@@ -123,7 +142,7 @@ object Vod {
         // Show the saved copy at once (however old); refresh it quietly in the background when it is stale
         ContentCache.vod(l, series, ignoreAge = true)?.let { old ->
             cache[key] = old
-            if (!ContentCache.isFresh(if (series) "series" else "movies", l)) refreshLater(l, series, key)
+            if (!ContentCache.isFresh(if (series) "series2" else "movies2", l)) refreshLater(l, series, key)
             return old
         }
         return try {
@@ -151,7 +170,7 @@ object Vod {
      * Reads the big JSON list straight from the network, item by item, keeping only the fields we show.
      * (Loading the whole thing as objects used up all the memory on TV boxes.)
      */
-    private fun <T> streamArray(url: String, item: (JsonReader) -> T?): List<T> {
+    internal fun <T> streamArray(url: String, item: (JsonReader) -> T?): List<T> {
         val req = Request.Builder().url(url).header("User-Agent", "VLC/3.0.18 LibVLC/3.0.18").build()
         Http.client.newCall(req).execute().use { r ->
             if (!r.isSuccessful) error("HTTP ${r.code}")
@@ -196,9 +215,9 @@ object Vod {
                 rd.endObject()
                 id?.let {
                     LibItem(
-                        it, name ?: "Series $it", cover?.ifBlank { null },
+                        it, name ?: "Series $it", Posters.pack(cover?.ifBlank { null }),
                         rating?.toDoubleOrNull() ?: 0.0, added?.toLongOrNull() ?: 0L,
-                        names[cat] ?: "Other", ""
+                        names[cat] ?: "Other", null
                     )
                 }
             }
@@ -222,10 +241,9 @@ object Vod {
                 rd.endObject()
                 id?.let {
                     LibItem(
-                        it, name ?: "Movie $it", icon?.ifBlank { null },
+                        it, name ?: "Movie $it", Posters.pack(icon?.ifBlank { null }),
                         rating?.toDoubleOrNull() ?: 0.0, added?.toLongOrNull() ?: 0L,
-                        names[cat] ?: "Other",
-                        "${b}movie/${l.user}/${l.pass}/$it.${ext ?: "mp4"}"
+                        names[cat] ?: "Other", ext ?: "mp4"
                     )
                 }
             }
@@ -259,7 +277,9 @@ object Preload {
         if (l.type == "m3u" || !done.add(l.id)) return
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             kotlinx.coroutines.delay(1_500)
+            PlayerFactory.awaitIdle()
             try { Vod.load(l, false) } catch (t: Throwable) { }
+            PlayerFactory.awaitIdle()
             try { Vod.load(l, true) } catch (t: Throwable) { }
         }
     }
@@ -270,6 +290,7 @@ object Preload {
         kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 kotlinx.coroutines.delay(15_000)
+                PlayerFactory.awaitIdle()
                 val fresh = if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
                 ContentCache.putChannels(l, fresh)
             } catch (t: Throwable) { }
