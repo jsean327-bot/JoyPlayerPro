@@ -99,6 +99,8 @@ object Vod {
         cache.keys.removeAll { it.startsWith(listId + "_") }
     }
 
+    fun invalidateAll() { cache.clear() }
+
     private val refreshing = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
