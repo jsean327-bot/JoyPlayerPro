@@ -335,7 +335,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 )
             }
             Row(Modifier.fillMaxSize()) {
-                Column(Modifier.weight(0.24f).fillMaxHeight().background(Color(0x33000000)).padding(6.dp)) {
+                Column(Modifier.weight(0.30f).fillMaxHeight().background(Color(0x33000000)).padding(6.dp)) {
                     Box(
                         Modifier.align(Alignment.CenterHorizontally).padding(top = 6.dp).size(60.dp)
                             .border(3.dp, Color.White, CircleShape),
@@ -366,7 +366,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                         }
                     }
                 }
-                Column(Modifier.weight(0.76f).fillMaxHeight()) {
+                Column(Modifier.weight(0.70f).fillMaxHeight()) {
                     sortRow()
                     gridArea()
                 }
