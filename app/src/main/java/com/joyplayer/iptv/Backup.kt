@@ -121,6 +121,39 @@ object Backup {
         return n
     }
 
+    private fun localDir(ctx: Context): java.io.File =
+        (ctx.getExternalFilesDir("backup") ?: java.io.File(ctx.filesDir, "backup")).also { it.mkdirs() }
+
+    /** Saves a backup on the device itself (no file manager needed). Returns a short description of where it went. */
+    fun saveLocal(ctx: Context): String {
+        val data = export(ctx).toByteArray(Charsets.UTF_8)
+        val name = "JoyPlayer-backup-" + SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date()) + ".json"
+        val dir = localDir(ctx)
+        java.io.File(dir, name).writeBytes(data)
+        // keep the newest 10 only
+        dir.listFiles { f -> f.name.endsWith(".json") }?.sortedByDescending { it.lastModified() }?.drop(10)?.forEach { it.delete() }
+        var where = "Android/data/${ctx.packageName}/files/backup/$name"
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            // a second copy in Downloads/JoyPlayer that survives uninstalling the app
+            runCatching {
+                val v = android.content.ContentValues().apply {
+                    put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+                    put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "application/json")
+                    put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS + "/JoyPlayer")
+                }
+                val u = ctx.contentResolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, v)
+                if (u != null) {
+                    ctx.contentResolver.openOutputStream(u)?.use { it.write(data) }
+                    where += "  +  Downloads/JoyPlayer/$name"
+                }
+            }
+        }
+        return where
+    }
+
+    fun listLocal(ctx: Context): List<java.io.File> =
+        localDir(ctx).listFiles { f -> f.name.endsWith(".json") }?.sortedByDescending { it.lastModified() } ?: emptyList()
+
     fun fetch(url: String): String {
         val u = url.trim()
         if (!u.startsWith("http://") && !u.startsWith("https://")) throw IllegalArgumentException("Enter a link starting with http")
@@ -141,6 +174,7 @@ fun BackupDialog(onDismiss: () -> Unit) {
     var msg by remember { mutableStateOf<String?>(null) }
     var link by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf<String?>(null) }
+    var localFiles by remember { mutableStateOf<List<java.io.File>>(emptyList()) }
 
     val saveLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
@@ -184,6 +218,32 @@ fun BackupDialog(onDismiss: () -> Unit) {
             "The backup contains your playlists (with passwords), favorites, history and settings. Keep it private.",
             color = C.Text, fontSize = 12.sp
         )
+        SOpt("💽  Save backup on this device", false) {
+            scope.launch {
+                msg = try {
+                    "✓ Saved: " + withContext(Dispatchers.IO) { Backup.saveLocal(ctx) }
+                } catch (e: Exception) {
+                    "✗ " + (e.message ?: "Could not save the backup")
+                }
+            }
+        }
+        SOpt("💽  Restore from this device", false) {
+            val l = Backup.listLocal(ctx)
+            localFiles = l
+            msg = if (l.isEmpty()) "✗ No backups saved on this device yet" else null
+        }
+        localFiles.forEach { f ->
+            SOpt("   " + f.name, false) {
+                scope.launch {
+                    try {
+                        pending = withContext(Dispatchers.IO) { f.readText(Charsets.UTF_8) }
+                        localFiles = emptyList(); msg = null
+                    } catch (e: Exception) {
+                        msg = "✗ " + (e.message ?: "Could not read the file")
+                    }
+                }
+            }
+        }
         SOpt("📤  Save backup to a file", false) {
             val day = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date())
             try { saveLauncher.launch("JoyPlayer-backup-$day.json") }
