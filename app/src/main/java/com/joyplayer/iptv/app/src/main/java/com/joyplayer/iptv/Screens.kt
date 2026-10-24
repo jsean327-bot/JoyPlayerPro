@@ -120,7 +120,8 @@ fun SideBtn(label: String, modifier: Modifier, onClick: () -> Unit) {
 fun HomeScreen(
     listName: String, loading: Boolean, error: String?,
     onNav: (String) -> Unit, onSoon: () -> Unit, onChange: () -> Unit, onReload: () -> Unit, onExit: () -> Unit,
-    onPlay: (Channel) -> Unit = {}
+    onPlay: (Channel) -> Unit = {},
+    list: SavedList? = null
 ) {
     val compact = rememberIsCompact()
     // the cursor starts on "Live"
@@ -130,6 +131,7 @@ fun HomeScreen(
         runCatching { liveFocus.requestFocus() }
     }
     Box(Modifier.fillMaxSize().wallpaper()) {
+        HomeNotices(list, Modifier.align(Alignment.TopStart))
         Column(Modifier.align(Alignment.TopEnd).padding(16.dp), horizontalAlignment = Alignment.End) {
             Text(if (loading) "Loading..." else listName, color = C.Text)
             ClockText()
