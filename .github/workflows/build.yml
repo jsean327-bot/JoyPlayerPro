@@ -39,3 +39,11 @@ jobs:
         run: |
           cp app/build/outputs/apk/debug/app-debug.apk JoyPlayer.apk
           gh release create "v${{ github.run_number }}" JoyPlayer.apk --target "${{ github.sha }}" --title "JoyPlayer 1.0.${{ github.run_number }}" --notes "Automatic build ${{ github.run_number }}" --latest || gh release upload "v${{ github.run_number }}" JoyPlayer.apk --clobber
+      - name: Remove old releases (keep the newest 5)
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --limit 300 --json tagName --jq '.[].tagName' | grep -E '^v[0-9]+$' | sed 's/^v//' | sort -rn | tail -n +6 | while read n; do
+            gh release delete "v$n" --cleanup-tag --yes || true
+          done
