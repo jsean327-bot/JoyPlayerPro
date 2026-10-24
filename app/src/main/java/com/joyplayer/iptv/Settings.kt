@@ -31,6 +31,7 @@ import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.SubtitleView
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -363,6 +364,7 @@ fun SettingsScreen(
         "pip" to "🖼️  PIP Settings",
         "epg" to "📅  EPG (XMLTV)",
         "backup" to "💾  Backup & Restore",
+        "cache" to "🗑️  Clear Cache",
         "update" to "⬆️  Update Now"
     )
 
@@ -661,6 +663,7 @@ fun SettingsScreen(
         }
         "pip" -> PipDialog { dialog = "" }
         "backup" -> BackupDialog { dialog = "" }
+        "cache" -> CacheDialog { dialog = "" }
         "epg" -> SDialog("EPG (XMLTV)", { dialog = "" }, maxHeight = 380.dp) {
             if (active == null) {
                 Text("Connect to a playlist first", color = Color(0xFFFF8A8A), fontSize = 13.sp)
@@ -721,5 +724,81 @@ fun SettingsScreen(
                 dismissButton = { TextButton(onClick = { dialog = "" }) { Text("Cancel") } }
             )
         }
+    }
+}
+
+
+private fun dirSize(f: java.io.File?): Long =
+    if (f == null || !f.exists()) 0L else if (f.isFile) f.length() else (f.listFiles()?.sumOf { dirSize(it) } ?: 0L)
+
+private fun fmtSize(b: Long): String =
+    if (b < 1024L * 1024L) "${b / 1024} KB" else "%.1f MB".format(b / 1048576.0)
+
+/** Empties the files the app can rebuild by itself; shows how much space each part uses. */
+@Composable
+private fun CacheDialog(onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var imgs by remember { mutableStateOf(-1L) }
+    var temp by remember { mutableStateOf(0L) }
+    var lists by remember { mutableStateOf(0L) }
+    var tick by remember { mutableStateOf(0) }
+    var busy by remember { mutableStateOf(false) }
+    LaunchedEffect(tick) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val i = dirSize(java.io.File(ctx.cacheDir, "img"))
+            imgs = i
+            temp = (dirSize(ctx.cacheDir) - i).coerceAtLeast(0L)
+            lists = dirSize(java.io.File(ctx.filesDir, "content_cache"))
+        }
+    }
+    fun clear(withLists: Boolean) {
+        busy = true
+        scope.launch {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                runCatching {
+                    val il = coil.Coil.imageLoader(ctx)
+                    il.memoryCache?.clear()
+                    il.diskCache?.clear()
+                }
+                // empty the folders but keep them, other parts of the app expect them to exist
+                ctx.cacheDir.listFiles()?.forEach { f ->
+                    if (f.name == "img") return@forEach
+                    if (f.isDirectory) f.listFiles()?.forEach { it.deleteRecursively() } else f.delete()
+                }
+                if (withLists) {
+                    java.io.File(ctx.filesDir, "content_cache").listFiles()?.forEach { it.delete() }
+                    Vod.invalidateAll()
+                }
+            }
+            busy = false
+            tick++
+            Toast.makeText(ctx, Lang.tr(if (withLists) "Cache and saved lists cleared" else "Cache cleared"), Toast.LENGTH_SHORT).show()
+        }
+    }
+    SDialog("Clear Cache", onDismiss, maxHeight = 460.dp) {
+        Text(
+            "The cache holds posters and logos you already saw, temporary files and the saved copy of your channel, movie and series lists. " +
+                "Clearing it frees space and fixes pictures that show wrong or stay blank. Nothing important is lost: favorites, history and settings stay.",
+            color = C.Text, fontSize = 13.sp
+        )
+        SubBlock {
+            Text("Pictures (posters, logos):  " + if (imgs < 0) "..." else fmtSize(imgs), color = Color.White, fontSize = 14.sp)
+            Text("Temporary files:  " + fmtSize(temp), color = Color.White, fontSize = 14.sp)
+            Text("Saved lists (make the app open fast):  " + fmtSize(lists), color = Color.White, fontSize = 14.sp)
+        }
+        Button(
+            onClick = { clear(false) }, enabled = !busy,
+            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy), modifier = Modifier.fillMaxWidth()
+        ) { Text("Clear pictures & temporary files") }
+        Text(
+            "Clearing the saved lists too makes the next start download everything again (slower, but gets a fresh copy).",
+            color = C.Text, fontSize = 12.sp
+        )
+        Button(
+            onClick = { clear(true) }, enabled = !busy,
+            colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark), modifier = Modifier.fillMaxWidth()
+        ) { Text("Clear everything (including saved lists)") }
+        Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = C.Blue), modifier = Modifier.fillMaxWidth()) { Text("Close") }
     }
 }
