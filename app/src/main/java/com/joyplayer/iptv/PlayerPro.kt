@@ -994,6 +994,33 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                             }
                         }
                     }
+                    if (AiConfig.enabled && subText != null && (subExt == "srt" || subExt == "vtt")) {
+                        Button(
+                            enabled = !busy,
+                            onClick = {
+                                val src = subText ?: return@Button
+                                val ext = subExt
+                                scope.launch {
+                                    busy = true; msg = "Translating... 0%"
+                                    try {
+                                        val out = Ai.translateSub(src, Ai.langName(lang)) { d, t -> msg = "Translating... ${d * 100 / t}%" }
+                                        val f = withContext(Dispatchers.IO) {
+                                            java.io.File(ctx.cacheDir, "sub_ai_${System.currentTimeMillis()}.$ext").also { it.writeText(out, Charsets.UTF_8) }
+                                        }
+                                        subText = out; subOffset = 0L; delayPending = 0L
+                                        loadSubFile(f, ext, "AI")
+                                        msg = "✓ Subtitle translated to " + Ai.langName(lang)
+                                    } catch (e: kotlinx.coroutines.CancellationException) {
+                                        throw e
+                                    } catch (e: Exception) {
+                                        msg = e.message ?: "AI error"
+                                    }
+                                    busy = false
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
+                        ) { Text("🤖  Translate this subtitle (AI)") }
+                    }
                     TextButton(onClick = { key = ""; settings.key = "" }) { Text("Change API key") }
                 }
             }
