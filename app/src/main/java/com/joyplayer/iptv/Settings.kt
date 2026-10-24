@@ -369,7 +369,6 @@ fun SettingsScreen(
         "auto" to "⚙️  Automatic",
         "clock" to "🕒  Time Format",
         "sub" to "💬  Subtitle Settings",
-        "ai" to "🤖  AI Assistant",
         "pip" to "🖼️  PIP Settings",
         "epg" to "📅  EPG (XMLTV)",
         "backup" to "💾  Backup & Restore",
@@ -685,7 +684,6 @@ fun SettingsScreen(
             }
         }
         "pip" -> PipDialog { dialog = "" }
-        "ai" -> AiDialog { dialog = "" }
         "backup" -> BackupDialog { dialog = "" }
         "cache" -> CacheDialog { dialog = "" }
         "epg" -> SDialog("EPG (XMLTV)", { dialog = "" }, maxHeight = 380.dp) {
