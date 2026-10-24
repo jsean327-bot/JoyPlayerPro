@@ -12,7 +12,8 @@ import retrofit2.http.Query
 
 data class Channel(
     val name: String, val url: String, val logo: String?, val group: String,
-    val tvgId: String? = null
+    val tvgId: String? = null,
+    val archiveDays: Int = 0          // > 0 = the provider keeps this channel for catch-up (days)
 )
 
 data class XCategory(@SerializedName("category_id") val id: String?, @SerializedName("category_name") val name: String?)
@@ -56,11 +57,12 @@ object Xtream {
         val cats = catList.associate { it.id to (it.name ?: "Other") }
         return streams.map { s ->
             Channel(s.name ?: "Channel ${s.id}", "${base}live/$user/$pass/${s.id}.m3u8",
-                s.icon?.ifBlank { null }, cats[s.cat] ?: "Other", s.epg?.ifBlank { null })
+                s.icon?.ifBlank { null }, cats[s.cat] ?: "Other", s.epg?.ifBlank { null },
+                if (s.arch == 1) (s.archDays ?: 0).let { if (it > 0) it else 3 } else 0)
         }
     }
 
-    private class Raw(val id: Int, val name: String?, val icon: String?, val cat: String?, val epg: String?)
+    private class Raw(val id: Int, val name: String?, val icon: String?, val cat: String?, val epg: String?, val arch: Int = 0, val archDays: Int? = null)
 
     private fun com.google.gson.stream.JsonReader.str(): String? = when (peek()) {
         com.google.gson.stream.JsonToken.NULL -> { nextNull(); null }
@@ -72,6 +74,7 @@ object Xtream {
     private fun readStreams(url: String): List<Raw> = Vod.streamArray(url) { rd ->
         var id: Int? = null; var name: String? = null; var icon: String? = null
         var cat: String? = null; var epg: String? = null
+        var arch = 0; var archDays: Int? = null
         rd.beginObject()
         while (rd.hasNext()) {
             when (rd.nextName()) {
@@ -80,10 +83,12 @@ object Xtream {
                 "stream_icon" -> icon = rd.str()
                 "category_id" -> cat = rd.str()
                 "epg_channel_id" -> epg = rd.str()
+                "tv_archive" -> arch = rd.str()?.toIntOrNull() ?: 0
+                "tv_archive_duration" -> archDays = rd.str()?.toIntOrNull()
                 else -> rd.skipValue()
             }
         }
         rd.endObject()
-        id?.let { Raw(it, name, icon, cat, epg) }
+        id?.let { Raw(it, name, icon, cat, epg, arch, archDays) }
     }
 }
