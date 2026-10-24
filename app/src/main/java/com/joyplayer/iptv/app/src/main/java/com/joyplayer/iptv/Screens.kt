@@ -311,24 +311,26 @@ fun CatRow(
                     }
                 }
             )
-            .combinedClickable(onLongClick = onLongClick, onClick = onClick).padding(10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+            .combinedClickable(onLongClick = onLongClick, onClick = onClick).padding(horizontal = 8.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // the whole name is shown (two lines if needed) instead of "VOD |..."
         Text(
-            label, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            fontSize = 14.sp, modifier = Modifier.weight(1f)
+            label, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            fontSize = 13.sp, lineHeight = 16.sp, modifier = Modifier.weight(1f)
         )
         if (checked != null && onCheck != null) {
             PickBox(checked, onCheck)
         } else if (starred != null && onStar != null) {
             // tap the star to add / remove the whole category from the favorites
             Text(
-                if (starred) "⭐" else "☆", fontSize = 18.sp, color = if (starred) Color(0xFFFFD54F) else Color.White,
+                if (starred) "⭐" else "☆", fontSize = 15.sp, color = if (starred) Color(0xFFFFD54F) else Color.White,
                 modifier = Modifier.clip(RoundedCornerShape(6.dp)).clickable(onClick = onStar)
-                    .padding(horizontal = 8.dp)
+                    .padding(horizontal = 4.dp)
             )
         }
-        Text("$count", color = if (selected) Color.White else C.Blue, fontSize = 14.sp)
+        Text("$count", color = if (selected) Color.White else C.Blue, fontSize = 13.sp, modifier = Modifier.padding(start = 4.dp))
     }
 }
 
