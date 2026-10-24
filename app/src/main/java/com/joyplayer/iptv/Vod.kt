@@ -1,6 +1,7 @@
 package com.joyplayer.iptv
 
 import com.google.gson.stream.JsonReader
+import kotlinx.coroutines.launch
 import com.google.gson.stream.JsonToken
 import okhttp3.Request
 import com.google.gson.annotations.SerializedName
@@ -81,7 +82,7 @@ data class LibItem(
 )
 
 object Vod {
-    private val cache = mutableMapOf<String, List<LibItem>>()
+    private val cache = java.util.concurrent.ConcurrentHashMap<String, List<LibItem>>()
 
     private fun base(server: String): String {
         var b = server.trim()
@@ -98,10 +99,31 @@ object Vod {
         cache.keys.removeAll { it.startsWith(listId + "_") }
     }
 
+    private val refreshing = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+    private fun refreshLater(l: SavedList, series: Boolean, key: String) {
+        if (!refreshing.add(key)) return          // once per app session
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                kotlinx.coroutines.delay(20_000)   // let the screen / player settle first
+                val items = fetchRemote(l, series)
+                ContentCache.putVod(l, series, items)   // used the next time the app starts
+            } catch (t: Throwable) {
+                // best-effort
+            }
+        }
+    }
+
     suspend fun load(l: SavedList, series: Boolean): List<LibItem> {
         val key = "${l.id}_$series"
         cache[key]?.let { return it }
-        ContentCache.vod(l, series)?.let { cache[key] = it; return it }
+        // Show the saved copy at once (however old); refresh it quietly in the background when it is stale
+        ContentCache.vod(l, series, ignoreAge = true)?.let { old ->
+            cache[key] = old
+            if (!ContentCache.isFresh(if (series) "series" else "movies", l)) refreshLater(l, series, key)
+            return old
+        }
         return try {
             val items = fetchRemote(l, series)
             cache[key] = items
@@ -223,4 +245,34 @@ object Vod {
                 }
             }
     }
+}
+
+
+/** Warms the Movies / Series lists into memory right after the playlist opens, so those tabs open instantly. */
+object Preload {
+    private val done = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
+
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+    fun vod(l: SavedList) {
+        if (l.type == "m3u" || !done.add(l.id)) return
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            kotlinx.coroutines.delay(1_500)
+            try { Vod.load(l, false) } catch (t: Throwable) { }
+            try { Vod.load(l, true) } catch (t: Throwable) { }
+        }
+    }
+
+    @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
+    fun refreshLive(l: SavedList) {
+        if (!done.add("live_" + l.id)) return
+        kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                kotlinx.coroutines.delay(15_000)
+                val fresh = if (l.type == "m3u") SmartList.fetchM3u(l.url) else Xtream.load(l.server, l.user, l.pass)
+                ContentCache.putChannels(l, fresh)
+            } catch (t: Throwable) { }
+        }
+    }
+
+    fun reset(listId: String) { done.removeAll { it == listId || it == "live_$listId" } }
 }
