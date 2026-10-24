@@ -54,7 +54,12 @@ data class VInfo(
     @SerializedName("release_date") val releaseDate3: String?,
     @SerializedName("rating_5based") val rating5: String?,
     val rating: String?,
-    @SerializedName("youtube_trailer") val trailer: String?
+    @SerializedName("youtube_trailer") val trailer: String?,
+    val duration: JsonElement? = null,
+    val director: JsonElement? = null,
+    val cast: JsonElement? = null,
+    val actors: JsonElement? = null,
+    val country: JsonElement? = null
 )
 
 data class VMovieInfo(val info: JsonElement?)
@@ -76,7 +81,9 @@ interface DetailService {
 
 data class Detail(
     val poster: String?, val backdrop: String?, val plot: String?, val genre: String?,
-    val release: String?, val rating5: Float, val trailer: String?
+    val release: String?, val rating5: Float, val trailer: String?,
+    val duration: String? = null, val director: String? = null,
+    val cast: String? = null, val country: String? = null
 )
 
 data class Ep(val ch: Channel, val num: Int)
@@ -110,6 +117,15 @@ object Details {
         Retrofit.Builder().baseUrl(b).client(Http.client).addConverterFactory(GsonConverterFactory.create())
             .build().create(DetailService::class.java)
 
+    private fun txt(e: JsonElement?): String? = try {
+        when {
+            e == null || e.isJsonNull -> null
+            e.isJsonPrimitive -> e.asString
+            e.isJsonArray -> e.asJsonArray.joinToString(", ") { it.asString }
+            else -> null
+        }?.trim()?.ifBlank { null }
+    } catch (ex: Exception) { null }
+
     private fun toDetail(el: JsonElement?): Detail {
         val i: VInfo? = try {
             if (el != null && el.isJsonObject) gson.fromJson(el, VInfo::class.java) else null
@@ -132,7 +148,11 @@ object Details {
             genre = i?.genre?.ifBlank { null },
             release = (i?.releaseDate ?: i?.releaseDate2 ?: i?.releaseDate3)?.ifBlank { null },
             rating5 = r5.coerceIn(0f, 5f),
-            trailer = i?.trailer?.ifBlank { null }
+            trailer = i?.trailer?.ifBlank { null },
+            duration = txt(i?.duration),
+            director = txt(i?.director),
+            cast = txt(i?.cast) ?: txt(i?.actors),
+            country = txt(i?.country)
         )
     }
 
@@ -175,6 +195,20 @@ object Details {
 
 private fun fmtDate(sec: Long): String =
     SimpleDateFormat("dd/MM/yyyy", Locale.US).format(Date(sec * 1000))
+
+private fun badgesFor(item: LibItem): List<String> {
+    val n = item.name.uppercase()
+    val out = ArrayList<String>()
+    if (item.added > 0 && System.currentTimeMillis() / 1000 - item.added < 14L * 86400) out.add("NEW")
+    when {
+        "4K" in n || "UHD" in n || "2160" in n -> out.add("4K")
+        "FHD" in n || "1080" in n -> out.add("FHD")
+        Regex("""\bHD\b|720""").containsMatchIn(n) -> out.add("HD")
+    }
+    if ("HEVC" in n || "H265" in n || "H.265" in n || "X265" in n) out.add("HEVC")
+    if ("HDR" in n) out.add("HDR")
+    return out
+}
 
 private fun stars(r: Float): String {
     val full = r.roundToInt().coerceIn(0, 5)
@@ -333,7 +367,24 @@ fun DetailScreen(
                             Text("  " + "%.1f".format(d.rating5), color = C.Text, fontSize = 13.sp)
                         }
                     }
+                    val badges = remember(item.id, item.name, item.added) { badgesFor(item) }
+                    if (badges.isNotEmpty()) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                            badges.forEach { b ->
+                                Text(
+                                    b, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.clip(RoundedCornerShape(4.dp))
+                                        .background(if (b == "NEW") Color(0xFFB3261E) else Color(0x66FFFFFF))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                    }
+                    detail?.duration?.let { Text("Duration : $it", color = C.Text, fontSize = 14.sp) }
                     detail?.genre?.let { Text("Genre : $it", color = C.Text, fontSize = 14.sp) }
+                    detail?.director?.let { Text("Director : $it", color = C.Text, fontSize = 14.sp) }
+                    detail?.cast?.let { Text("Cast : ${it.take(160)}", color = C.Text, fontSize = 14.sp) }
+                    detail?.country?.let { Text("Country : $it", color = C.Text, fontSize = 14.sp) }
                     if (item.added > 0) Text("Date Added : ${fmtDate(item.added)}", color = C.Text, fontSize = 14.sp)
                     Spacer(Modifier.height(6.dp))
                     detail?.plot?.let { Text(it, color = Color.White, fontSize = 14.sp) }
