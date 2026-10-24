@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +64,20 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     var order by remember { mutableStateOf(0) }
     var menu by remember { mutableStateOf(false) }
     var open by remember(key) { mutableStateOf<LibItem?>(null) }
+    // the list keeps its scroll position and the cursor goes back to the movie you opened
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    val rowsState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var lastOpen by remember(key) { mutableStateOf<String?>(null) }
+    val backFocus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(cat, query, order, key) {
+        runCatching { gridState.scrollToItem(0); rowsState.scrollToItem(0) }
+    }
+    LaunchedEffect(open) {
+        if (open == null && lastOpen != null) {
+            kotlinx.coroutines.delay(350)
+            runCatching { backFocus.requestFocus() }
+        }
+    }
 
     LaunchedEffect(key) {
         if (list == null || list.type != "xtream") {
@@ -155,6 +170,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     val openItem: (LibItem) -> Unit = { item ->
         store.pushRecent(key, item.id.toString())
         recents = store.recents(key)
+        lastOpen = item.id.toString()
         open = item
     }
     val toggleFav: (LibItem) -> Unit = { item ->
@@ -205,10 +221,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             error != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(error ?: "", color = Color(0xFFFF8A8A))
             }
-            AppPrefs.listLayout -> LazyColumn(Modifier.padding(horizontal = 12.dp)) {
+            AppPrefs.listLayout -> LazyColumn(Modifier.padding(horizontal = 12.dp), rowsState) {
                 items(shown) { item ->
                     Box(Modifier.padding(vertical = 4.dp)) {
-                        PosterRow(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) })
+                        PosterRow(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else Modifier)
                     }
                 }
             }
@@ -216,10 +232,11 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                 GridCells.Adaptive(AppPrefs.posterDp.dp),
                 contentPadding = PaddingValues(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                state = gridState
             ) {
                 gridItems(shown) { item ->
-                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) })
+                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else Modifier)
                 }
             }
         }
@@ -319,9 +336,9 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit) {
+fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit, focusMod: Modifier = Modifier) {
     Column(
-        Modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
+        focusMod.clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
             .combinedClickable(onLongClick = onFav, onClick = onClick)
     ) {
         Box(Modifier.fillMaxWidth().aspectRatio(2f / 3f).background(Color.Black)) {
@@ -346,9 +363,9 @@ fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Un
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun PosterRow(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit) {
+fun PosterRow(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit, focusMod: Modifier = Modifier) {
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
+        focusMod.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
             .combinedClickable(onLongClick = onFav, onClick = onClick).padding(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
