@@ -78,17 +78,45 @@ object Xtream {
         val api = Retrofit.Builder().baseUrl(base).client(Http.client)
             .addConverterFactory(GsonConverterFactory.create())
             .build().create(XtreamService::class.java)
-        // categories and channels are asked at the same time
+        fun enc(x: String) = java.net.URLEncoder.encode(x, "UTF-8")
+        val liveUrl = "${base}player_api.php?username=${enc(user)}&password=${enc(pass)}&action=get_live_streams"
+        // categories and channels are asked at the same time; the big channel list is read piece by piece
         val (catList, streams) = coroutineScope {
             val c = async { api.categories(user, pass) }
-            val s = async { api.live(user, pass) }
+            val s = async(kotlinx.coroutines.Dispatchers.IO) { readStreams(liveUrl) }
             c.await() to s.await()
         }
         val cats = catList.associate { it.id to (it.name ?: "Other") }
-        return streams.mapNotNull { s ->
-            val id = s.streamId ?: return@mapNotNull null
-            Channel(s.name ?: "Channel $id", "${base}live/$user/$pass/$id.m3u8",
-                s.icon?.ifBlank { null }, cats[s.categoryId] ?: "Other")
+        return streams.map { s ->
+            Channel(s.name ?: "Channel ${s.id}", "${base}live/$user/$pass/${s.id}.m3u8",
+                s.icon?.ifBlank { null }, cats[s.cat] ?: "Other", s.epg?.ifBlank { null })
         }
+    }
+
+    private class Raw(val id: Int, val name: String?, val icon: String?, val cat: String?, val epg: String?)
+
+    private fun com.google.gson.stream.JsonReader.str(): String? = when (peek()) {
+        com.google.gson.stream.JsonToken.NULL -> { nextNull(); null }
+        com.google.gson.stream.JsonToken.STRING, com.google.gson.stream.JsonToken.NUMBER -> nextString()
+        com.google.gson.stream.JsonToken.BOOLEAN -> nextBoolean().toString()
+        else -> { skipValue(); null }
+    }
+
+    private fun readStreams(url: String): List<Raw> = Vod.streamArray(url) { rd ->
+        var id: Int? = null; var name: String? = null; var icon: String? = null
+        var cat: String? = null; var epg: String? = null
+        rd.beginObject()
+        while (rd.hasNext()) {
+            when (rd.nextName()) {
+                "stream_id" -> id = rd.str()?.toIntOrNull()
+                "name" -> name = rd.str()
+                "stream_icon" -> icon = rd.str()
+                "category_id" -> cat = rd.str()
+                "epg_channel_id" -> epg = rd.str()
+                else -> rd.skipValue()
+            }
+        }
+        rd.endObject()
+        id?.let { Raw(it, name, icon, cat, epg) }
     }
 }
