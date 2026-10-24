@@ -97,6 +97,7 @@ object PlayMeta {
 object Details {
     private val gson = Gson()
     private val epType = object : TypeToken<Map<String, List<VEpisode>>>() {}.type
+    private val listType = object : TypeToken<List<VEpisode>>() {}.type
 
     private fun base(server: String): String {
         var b = server.trim()
@@ -106,7 +107,7 @@ object Details {
     }
 
     private fun api(b: String): DetailService =
-        Retrofit.Builder().baseUrl(b).addConverterFactory(GsonConverterFactory.create())
+        Retrofit.Builder().baseUrl(b).client(Http.client).addConverterFactory(GsonConverterFactory.create())
             .build().create(DetailService::class.java)
 
     private fun toDetail(el: JsonElement?): Detail {
@@ -143,8 +144,19 @@ object Details {
         val r = api(b).series(l.user, l.pass, id)
         val raw: Map<String, List<VEpisode>> = try {
             val e = r.episodes
-            if (e != null && e.isJsonObject) gson.fromJson(e, epType) else emptyMap()
-        } catch (e: Exception) { emptyMap() }
+            when {
+                e == null -> emptyMap()
+                e.isJsonObject -> gson.fromJson(e, epType)
+                e.isJsonArray -> {          // some servers send the seasons as a list: position = season number
+                    val m = LinkedHashMap<String, List<VEpisode>>()
+                    e.asJsonArray.forEachIndexed { i, el ->
+                        if (el.isJsonArray) m[i.toString()] = gson.fromJson(el, listType)
+                    }
+                    m
+                }
+                else -> emptyMap()
+            }
+        } catch (e: Exception) { throw IllegalStateException("Episode list could not be read") }
         val eps = raw.entries.sortedBy { it.key.toIntOrNull() ?: 0 }.associate { (season, list) ->
             season to list.sortedBy { it.num ?: 0 }.map { e ->
                 Ep(
@@ -182,8 +194,11 @@ fun DetailScreen(
     var season by remember(item.id) { mutableStateOf<String?>(null) }
     var loading by remember(item.id) { mutableStateOf(true) }
     var note by remember(item.id) { mutableStateOf<String?>(null) }
+    var tick by remember(item.id) { mutableStateOf(0) }
+    var failed by remember(item.id) { mutableStateOf(false) }
 
-    LaunchedEffect(item.id) {
+    LaunchedEffect(item.id, tick) {
+        loading = true; failed = false; note = null
         try {
             if (isSeries) {
                 val (d, eps) = withContext(Dispatchers.IO) { Details.series(list, item.id) }
@@ -192,8 +207,13 @@ fun DetailScreen(
             } else {
                 detail = withContext(Dispatchers.IO) { Details.movie(list, item.id) }
             }
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
         } catch (e: Exception) {
-            if (isSeries) note = "No episodes available"
+            if (isSeries) {
+                failed = true
+                note = "Could not load episodes: " + (e.message ?: e.javaClass.simpleName).take(70)
+            }
         }
         loading = false
     }
@@ -319,6 +339,10 @@ fun DetailScreen(
                     if (isSeries) {
                         Spacer(Modifier.height(12.dp))
                         note?.let { Text(it, color = Color(0xFFFF8A8A)) }
+                        if (failed) Button(
+                            onClick = { tick++ },
+                            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
+                        ) { Text("Retry") }
                         Row(
                             Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
