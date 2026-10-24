@@ -1,0 +1,51 @@
+{
+  "name": "joyplayer-iptv-pro",
+  "productName": "JoyPlayer IPTV Pro",
+  "version": "1.0.0",
+  "description": "JoyPlayer IPTV Pro for Windows",
+  "main": "main.js",
+  "author": "JoyPlayer",
+  "license": "UNLICENSED",
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis portable"
+  },
+  "dependencies": {
+    "hls.js": "1.5.13",
+    "mpegts.js": "1.7.3"
+  },
+  "devDependencies": {
+    "electron": "30.5.1",
+    "electron-builder": "24.13.3"
+  },
+  "build": {
+    "appId": "com.joyplayer.iptv.windows",
+    "productName": "JoyPlayer IPTV Pro",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "css/**/*",
+      "js/**/*",
+      "build/icon.png",
+      "node_modules/hls.js/dist/hls.min.js",
+      "node_modules/mpegts.js/dist/mpegts.js"
+    ],
+    "directories": { "output": "dist" },
+    "win": {
+      "icon": "build/icon.png",
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "JoyPlayer-IPTV-Pro-Setup-${arch}.${ext}"
+    },
+    "portable": {
+      "artifactName": "JoyPlayer-IPTV-Pro-Portable-${arch}.${ext}"
+    }
+  }
+}
