@@ -233,8 +233,9 @@ fun DetailScreen(
 
     fun playMovie() {
         PlayQueue.clear()
-        PlayMeta.map[item.url] = SubMeta(PlayMeta.cleanTitle(item.name), PlayMeta.year(item.name), null, null)
-        onPlay(Channel(item.name, item.url, item.poster, item.cat))
+        val mu = item.playUrl(list)
+        PlayMeta.map[mu] = SubMeta(PlayMeta.cleanTitle(item.name), PlayMeta.year(item.name), null, null)
+        onPlay(Channel(item.name, mu, item.poster, item.cat))
     }
 
     fun playQueued(ch: Channel, meta: SubMeta) {
@@ -290,7 +291,7 @@ fun DetailScreen(
             val info: @Composable ColumnScope.() -> Unit = {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         val cont = if (isSeries && resumeVer >= 0) PlayQueue.continuePoint()?.takeIf { c -> queue.any { it.first.url == c.first.url } } else null
-                        val movieResume = !isSeries && resumeVer >= 0 && ResumeStore.get(item.url) > 0L
+                        val movieResume = !isSeries && resumeVer >= 0 && ResumeStore.get(item.playUrl(list)) > 0L
                         val bw = if (compact) Modifier.weight(1f) else Modifier
                         Button(
                             modifier = bw.focusRequester(playFocus),
