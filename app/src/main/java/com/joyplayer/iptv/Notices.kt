@@ -175,39 +175,63 @@ object Diag {
             }
         } catch (e: Exception) { line("✗ Channels: ${mask(e.message ?: e.javaClass.simpleName, l)}") }
 
-        // 3b) program guide + catch-up probe
+        // 3b) program guide + catch-up probe (scans the whole channel list like the app does)
         try {
             line("")
-            var epgId: String? = firstId
-            var archId: String? = null
-            for (cid in catIds.take(8)) {
-                val arr = JsonParser.parseString(get("&action=get_live_streams&category_id=$cid")).asJsonArray
-                val hit = arr.firstOrNull { e ->
-                    val o = e.asJsonObject
-                    runCatching { o.get("tv_archive").asString == "1" }.getOrDefault(false)
+            class Ch(val id: String, val name: String, val epg: String, val arch: Boolean)
+            t0 = System.nanoTime()
+            val all = Vod.streamArray("${base}player_api.php?$q&action=get_live_streams") { rd ->
+                var id = ""; var nm = ""; var ep = ""; var ar = false
+                rd.beginObject()
+                while (rd.hasNext()) {
+                    val k = rd.nextName()
+                    val v: String? = when (rd.peek()) {
+                        com.google.gson.stream.JsonToken.STRING, com.google.gson.stream.JsonToken.NUMBER -> rd.nextString()
+                        com.google.gson.stream.JsonToken.NULL -> { rd.nextNull(); null }
+                        else -> { rd.skipValue(); null }
+                    }
+                    when (k) {
+                        "stream_id" -> id = v ?: ""
+                        "name" -> nm = v ?: ""
+                        "epg_channel_id" -> ep = v ?: ""
+                        "tv_archive" -> ar = v == "1"
+                    }
                 }
-                if (hit != null) { archId = hit.asJsonObject.get("stream_id").asString; break }
+                rd.endObject()
+                if (id.isEmpty()) null else Ch(id, nm, ep.trim(), ar)
             }
-            if (archId == null) line("• Catch-up: no channel with tv_archive=1 in the first 8 categories (the provider may not offer it)")
-            val testId = archId ?: epgId
-            if (testId != null) {
-                val liveU = "${base}live/${l.user}/${l.pass}/$testId.m3u8"
-                t0 = System.nanoTime()
+            val withEpg = all.filter { it.epg.isNotEmpty() }
+            val withArch = all.filter { it.arch }
+            line("✓ All channels: ${all.size} | with guide id: ${withEpg.size} | with catch-up: ${withArch.size} (${ms(t0)})")
+            val nowS = System.currentTimeMillis() / 1000
+            suspend fun probeGuide(c: Ch, tag: String): List<EpgItem> {
+                val liveU = "${base}live/${l.user}/${l.pass}/${c.id}.m3u8"
                 val short = Epg.load(liveU)
-                line((if (short.isNotEmpty()) "✓" else "✗") + " Guide (short): ${short.size} programs (${ms(t0)})" + if (archId != null) "  [archive channel $testId]" else "  [channel $testId]")
-                t0 = System.nanoTime()
                 val full = Epg.loadFull(liveU)
-                line((if (full.isNotEmpty()) "✓" else "✗") + " Guide (full): ${full.size} programs (${ms(t0)})")
-                val nowS = System.currentTimeMillis() / 1000
-                full.firstOrNull { it.start <= nowS && nowS < it.end }?.let { line("  now: ${it.title.take(40)} | server time text: '${it.startStr}'") }
+                line((if (short.isNotEmpty() || full.isNotEmpty()) "✓" else "✗") + " Guide $tag '${c.name.take(24)}' [${c.epg.take(24)}]: short ${short.size}, full ${full.size}")
+                full.firstOrNull { it.start <= nowS && nowS < it.end }?.let { line("   now: ${it.title.take(40)} | server clock '${it.startStr}'") }
+                return full
+            }
+            // a few channels that have a guide id, to see whether the server really delivers programs
+            var gotGuide = false
+            for (c in withEpg.take(4)) { if (probeGuide(c, "").isNotEmpty()) { gotGuide = true } }
+            if (withEpg.isEmpty()) line("• No channel has a guide id (epg_channel_id): this playlist has no program guide on the server")
+            else if (!gotGuide) line("• The server returns no programs for these channels (guide not loaded on the provider side)")
+            val tc = withArch.firstOrNull()
+            if (tc == null) {
+                line("• Catch-up: the provider marks NO channel with tv_archive=1, so catch-up is not offered")
+            } else {
+                val full = probeGuide(tc, "(catch-up channel)")
                 val past = full.lastOrNull { it.end <= nowS }
-                if (archId != null && past != null) {
+                if (past == null) line("• Catch-up: no past program in the guide to test")
+                else {
+                    val liveU = "${base}live/${l.user}/${l.pass}/${tc.id}.m3u8"
                     val u1 = Epg.catchupUrl(liveU, past)
                     val variants = listOfNotNull(
                         u1,
                         u1?.removeSuffix(".ts")?.plus(".m3u8"),
                         "${base}streaming/timeshift.php?username=${URLEncoder.encode(l.user, "UTF-8")}&password=${URLEncoder.encode(l.pass, "UTF-8")}" +
-                            "&stream=$archId&start=" + (u1?.substringBeforeLast('/')?.substringAfterLast('/') ?: "") +
+                            "&stream=${tc.id}&start=" + (u1?.substringBeforeLast('/')?.substringAfterLast('/') ?: "") +
                             "&duration=" + (u1?.substringBeforeLast('/')?.substringBeforeLast('/')?.substringAfterLast('/') ?: "60")
                     )
                     for (u in variants) {
@@ -221,7 +245,7 @@ object Diag {
                             }
                         } catch (e: Exception) { line("✗ Catch-up: ${mask(e.message ?: e.javaClass.simpleName, l)}") }
                     }
-                } else if (archId != null) line("• Catch-up: no past program in the guide to test")
+                }
             }
         } catch (e: Exception) { line("✗ Guide test: ${mask(e.message ?: e.javaClass.simpleName, l)}") }
 
