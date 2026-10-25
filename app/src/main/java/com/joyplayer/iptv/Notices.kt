@@ -158,19 +158,72 @@ object Diag {
 
         // 3) categories + a first channel
         var streamUrl: String? = null
+        var catIds = listOf<String>()
+        var firstId: String? = null
         t0 = System.nanoTime()
         try {
             val cats = JsonParser.parseString(get("&action=get_live_categories")).asJsonArray
             line("✓ Live categories: ${cats.size()} (${ms(t0)})")
-            val cid = cats.firstOrNull()?.asJsonObject?.get("category_id")?.asString
+            catIds = cats.mapNotNull { runCatching { it.asJsonObject.get("category_id").asString }.getOrNull() }
+            val cid = catIds.firstOrNull()
             if (cid != null) {
                 t0 = System.nanoTime()
                 val arr = JsonParser.parseString(get("&action=get_live_streams&category_id=$cid")).asJsonArray
                 line("✓ Channels in first category: ${arr.size()} (${ms(t0)})")
                 val id = arr.firstOrNull()?.asJsonObject?.get("stream_id")?.asString
-                if (id != null) streamUrl = "${base}live/${l.user}/${l.pass}/$id.ts"
+                if (id != null) { streamUrl = "${base}live/${l.user}/${l.pass}/$id.ts"; firstId = id }
             }
         } catch (e: Exception) { line("✗ Channels: ${mask(e.message ?: e.javaClass.simpleName, l)}") }
+
+        // 3b) program guide + catch-up probe
+        try {
+            line("")
+            var epgId: String? = firstId
+            var archId: String? = null
+            for (cid in catIds.take(8)) {
+                val arr = JsonParser.parseString(get("&action=get_live_streams&category_id=$cid")).asJsonArray
+                val hit = arr.firstOrNull { e ->
+                    val o = e.asJsonObject
+                    runCatching { o.get("tv_archive").asString == "1" }.getOrDefault(false)
+                }
+                if (hit != null) { archId = hit.asJsonObject.get("stream_id").asString; break }
+            }
+            if (archId == null) line("• Catch-up: no channel with tv_archive=1 in the first 8 categories (the provider may not offer it)")
+            val testId = archId ?: epgId
+            if (testId != null) {
+                val liveU = "${base}live/${l.user}/${l.pass}/$testId.m3u8"
+                t0 = System.nanoTime()
+                val short = Epg.load(liveU)
+                line((if (short.isNotEmpty()) "✓" else "✗") + " Guide (short): ${short.size} programs (${ms(t0)})" + if (archId != null) "  [archive channel $testId]" else "  [channel $testId]")
+                t0 = System.nanoTime()
+                val full = Epg.loadFull(liveU)
+                line((if (full.isNotEmpty()) "✓" else "✗") + " Guide (full): ${full.size} programs (${ms(t0)})")
+                val nowS = System.currentTimeMillis() / 1000
+                full.firstOrNull { it.start <= nowS && nowS < it.end }?.let { line("  now: ${it.title.take(40)} | server time text: '${it.startStr}'") }
+                val past = full.lastOrNull { it.end <= nowS }
+                if (archId != null && past != null) {
+                    val u1 = Epg.catchupUrl(liveU, past)
+                    val variants = listOfNotNull(
+                        u1,
+                        u1?.removeSuffix(".ts")?.plus(".m3u8"),
+                        "${base}streaming/timeshift.php?username=${URLEncoder.encode(l.user, "UTF-8")}&password=${URLEncoder.encode(l.pass, "UTF-8")}" +
+                            "&stream=$archId&start=" + (u1?.substringBeforeLast('/')?.substringAfterLast('/') ?: "") +
+                            "&duration=" + (u1?.substringBeforeLast('/')?.substringBeforeLast('/')?.substringAfterLast('/') ?: "60")
+                    )
+                    for (u in variants) {
+                        t0 = System.nanoTime()
+                        try {
+                            val c = Http.client.newBuilder().readTimeout(8, TimeUnit.SECONDS).callTimeout(12, TimeUnit.SECONDS).build()
+                            c.newCall(okhttp3.Request.Builder().url(u).header("Range", "bytes=0-4095").header("User-Agent", "VLC/3.0.18 LibVLC/3.0.18").build()).execute().use { r ->
+                                val n = r.body?.source()?.let { src -> runCatching { src.request(2048); src.buffer.size }.getOrDefault(0L) } ?: 0L
+                                line((if (r.isSuccessful && n > 0) "✓" else "✗") + " Catch-up HTTP ${r.code}, ${r.header("Content-Type") ?: "?"}, ${n} bytes (${ms(t0)})")
+                                line("   " + mask(u, l).replace(Regex("^https?://[^/]+"), "<server>"))
+                            }
+                        } catch (e: Exception) { line("✗ Catch-up: ${mask(e.message ?: e.javaClass.simpleName, l)}") }
+                    }
+                } else if (archId != null) line("• Catch-up: no past program in the guide to test")
+            }
+        } catch (e: Exception) { line("✗ Guide test: ${mask(e.message ?: e.javaClass.simpleName, l)}") }
 
         // 4) real stream speed (reads up to ~6 seconds)
         if (streamUrl != null) {
