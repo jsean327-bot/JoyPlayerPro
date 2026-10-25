@@ -53,7 +53,7 @@ data class AccountInfo(
 )
 
 object AccountApi {
-    private val http = OkHttpClient.Builder()
+    private val http = OkHttpClient.Builder().dns(SmartDns)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()
