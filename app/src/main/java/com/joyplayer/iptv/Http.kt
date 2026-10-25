@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
 object Http {
     val client: OkHttpClient by lazy {
         val d = Dispatcher().apply { maxRequests = 64; maxRequestsPerHost = 16 }
-        OkHttpClient.Builder()
+        OkHttpClient.Builder().dns(SmartDns)
             .dispatcher(d)
             .connectionPool(ConnectionPool(10, 5, TimeUnit.MINUTES))
             .connectTimeout(15, TimeUnit.SECONDS)
