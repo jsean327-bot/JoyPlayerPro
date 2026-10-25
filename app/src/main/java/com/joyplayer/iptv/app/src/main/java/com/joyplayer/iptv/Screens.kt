@@ -531,10 +531,13 @@ private fun LivePane(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
             contentAlignment = Alignment.Center
         ) {
-            LivePreviewSurface(player, sel, onFull)
+            var show by remember { mutableStateOf(false) }
+            var stamp by remember { mutableStateOf(0) }
+            LaunchedEffect(stamp) { if (stamp > 0) { show = true; delay(3500); show = false } }
+            LivePreviewSurface(player, sel, onFull) { stamp++ }
             if (sel == null) Text("Select a channel", color = C.Text)
+            else PreviewOverlay(player, sel, show) { stamp++ }
         }
-        if (sel != null) PreviewControls(player, sel)
         Spacer(Modifier.height(8.dp))
         if (compact) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -576,9 +579,9 @@ private fun LivePane(
     }
 }
 
-/** Under the small preview: previous channel, pause / resume, next channel. */
+/** Controls drawn over the small preview (tap the picture to show them): previous channel, pause / resume, next channel. */
 @Composable
-private fun PreviewControls(player: ExoPlayer, sel: Channel) {
+private fun PreviewOverlay(player: ExoPlayer, sel: Channel, show: Boolean, keep: () -> Unit) {
     var on by remember(player) { mutableStateOf(player.playWhenReady) }
     DisposableEffect(player) {
         val l = object : androidx.media3.common.Player.Listener {
@@ -594,24 +597,54 @@ private fun PreviewControls(player: ExoPlayer, sel: Channel) {
         val n = l[((if (i < 0) 0 else i) + d + l.size) % l.size]
         LiveZap.onSelect?.invoke(n)
     }
-    Row(
-        Modifier.fillMaxWidth().padding(top = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically
+    if (!show && on) return
+    Box(Modifier.fillMaxSize().background(Color(0x55000000)), contentAlignment = Alignment.Center) {
+        Row(horizontalArrangement = Arrangement.spacedBy(28.dp), verticalAlignment = Alignment.CenterVertically) {
+            CtlIcon(0, 34.dp, Color(0xCCFFFFFF), null) { keep(); step(-1) }
+            CtlIcon(if (on) 2 else 3, 48.dp, Color(0xFF14102E), Color.White) { keep(); player.playWhenReady = !player.playWhenReady }
+            CtlIcon(1, 34.dp, Color(0xCCFFFFFF), null) { keep(); step(1) }
+        }
+    }
+}
+
+/** kind: 0 = previous, 1 = next, 2 = pause, 3 = play (drawn by hand, no icon library needed) */
+@Composable
+private fun CtlIcon(kind: Int, box: androidx.compose.ui.unit.Dp, tint: Color, bg: Color?, onClick: () -> Unit) {
+    Box(
+        Modifier.size(box).clip(androidx.compose.foundation.shape.CircleShape)
+            .then(if (bg != null) Modifier.background(bg) else Modifier)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
     ) {
-        Button(
-            onClick = { step(-1) }, modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
-            contentPadding = PaddingValues(horizontal = 8.dp)
-        ) { Text("⏮", fontSize = 16.sp) }
-        Button(
-            onClick = { player.playWhenReady = !player.playWhenReady }, modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(containerColor = C.Blue),
-            contentPadding = PaddingValues(horizontal = 8.dp)
-        ) { Text(if (on) "⏸" else "▶", fontSize = 16.sp) }
-        Button(
-            onClick = { step(1) }, modifier = Modifier.weight(1f),
-            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
-            contentPadding = PaddingValues(horizontal = 8.dp)
-        ) { Text("⏭", fontSize = 16.sp) }
+        androidx.compose.foundation.Canvas(Modifier.fillMaxSize(0.46f)) {
+            val w = size.width
+            val h = size.height
+            when (kind) {
+                0 -> {
+                    drawRect(tint, androidx.compose.ui.geometry.Offset(0f, 0f), androidx.compose.ui.geometry.Size(w * 0.16f, h))
+                    val p = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(w, 0f); lineTo(w * 0.24f, h / 2f); lineTo(w, h); close()
+                    }
+                    drawPath(p, tint)
+                }
+                1 -> {
+                    drawRect(tint, androidx.compose.ui.geometry.Offset(w * 0.84f, 0f), androidx.compose.ui.geometry.Size(w * 0.16f, h))
+                    val p = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(0f, 0f); lineTo(w * 0.76f, h / 2f); lineTo(0f, h); close()
+                    }
+                    drawPath(p, tint)
+                }
+                2 -> {
+                    drawRect(tint, androidx.compose.ui.geometry.Offset(w * 0.08f, 0f), androidx.compose.ui.geometry.Size(w * 0.30f, h))
+                    drawRect(tint, androidx.compose.ui.geometry.Offset(w * 0.62f, 0f), androidx.compose.ui.geometry.Size(w * 0.30f, h))
+                }
+                else -> {
+                    val p = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(w * 0.12f, 0f); lineTo(w, h / 2f); lineTo(w * 0.12f, h); close()
+                    }
+                    drawPath(p, tint)
+                }
+            }
+        }
     }
 }
