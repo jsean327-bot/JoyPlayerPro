@@ -33,6 +33,7 @@ object LiveRecover {
         val stallRun = Runnable {
             if (p.playbackState == Player.STATE_BUFFERING && p.playWhenReady && stallN < MAX) {
                 stallN++
+                AppLog.add("live", "stalled, reconnect #$stallN")
                 PlayerFactory.reconnecting = stallN
                 restart()
             }
