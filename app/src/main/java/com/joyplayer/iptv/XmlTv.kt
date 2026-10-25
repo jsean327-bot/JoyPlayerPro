@@ -27,7 +27,7 @@ object XmlTv {
     private var programs: Map<String, List<EpgItem>> = emptyMap()   // channel id (lowercase) -> programs
     private var names: Map<String, String> = emptyMap()             // simplified channel name -> channel id
 
-    private val http = OkHttpClient.Builder()
+    private val http = OkHttpClient.Builder().dns(SmartDns)
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .build()
