@@ -534,6 +534,7 @@ private fun LivePane(
             LivePreviewSurface(player, sel, onFull)
             if (sel == null) Text("Select a channel", color = C.Text)
         }
+        if (sel != null) PreviewControls(player, sel)
         Spacer(Modifier.height(8.dp))
         if (compact) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -572,5 +573,45 @@ private fun LivePane(
                 }
             }
         }
+    }
+}
+
+/** Under the small preview: previous channel, pause / resume, next channel. */
+@Composable
+private fun PreviewControls(player: ExoPlayer, sel: Channel) {
+    var on by remember(player) { mutableStateOf(player.playWhenReady) }
+    DisposableEffect(player) {
+        val l = object : androidx.media3.common.Player.Listener {
+            override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) { on = playWhenReady }
+        }
+        player.addListener(l)
+        onDispose { player.removeListener(l) }
+    }
+    fun step(d: Int) {
+        val l = LiveZap.list
+        if (l.size < 2) return
+        val i = l.indexOfFirst { it.url == sel.url }
+        val n = l[((if (i < 0) 0 else i) + d + l.size) % l.size]
+        LiveZap.onSelect?.invoke(n)
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(top = 6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically
+    ) {
+        Button(
+            onClick = { step(-1) }, modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+            contentPadding = PaddingValues(horizontal = 8.dp)
+        ) { Text("⏮", fontSize = 16.sp) }
+        Button(
+            onClick = { player.playWhenReady = !player.playWhenReady }, modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = C.Blue),
+            contentPadding = PaddingValues(horizontal = 8.dp)
+        ) { Text(if (on) "⏸" else "▶", fontSize = 16.sp) }
+        Button(
+            onClick = { step(1) }, modifier = Modifier.weight(1f),
+            colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
+            contentPadding = PaddingValues(horizontal = 8.dp)
+        ) { Text("⏭", fontSize = 16.sp) }
     }
 }
