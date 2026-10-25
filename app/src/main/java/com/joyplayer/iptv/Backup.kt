@@ -48,7 +48,7 @@ object Backup {
         "joyplayer_subs", "joyplayer_resume", "joyplayer_player", "joyplayer_lang"
     )
 
-    private val http = OkHttpClient.Builder()
+    private val http = OkHttpClient.Builder().dns(SmartDns)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .build()
