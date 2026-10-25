@@ -23,6 +23,7 @@ object CrashLog {
 
     fun install(ctx: Context) {
         val app = ctx.applicationContext
+        AppLog.init(app)
         val previous = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { t, e ->
             try {
@@ -31,6 +32,7 @@ object CrashLog {
                 )
             } catch (_: Throwable) {
             }
+            try { AppLog.add("CRASH", e.javaClass.simpleName + ": " + (e.message ?: "") + " @ " + (e.stackTrace.firstOrNull()?.toString() ?: "")) } catch (_: Throwable) { }
             previous?.uncaughtException(t, e)
         }
     }
