@@ -77,9 +77,10 @@ fun rememberLivePlayer(sel: Channel?, paused: Boolean): ExoPlayer {
 }
 
 @Composable
-fun LivePreviewSurface(player: ExoPlayer, sel: Channel?, onFull: (Channel) -> Unit) {
+fun LivePreviewSurface(player: ExoPlayer, sel: Channel?, onFull: (Channel) -> Unit, onTap: () -> Unit = {}) {
     val current by rememberUpdatedState(sel)
     val full by rememberUpdatedState(onFull)
+    val tap by rememberUpdatedState(onTap)
     AndroidView(
         factory = { c ->
             PlayerView(c).apply {
@@ -89,6 +90,10 @@ fun LivePreviewSurface(player: ExoPlayer, sel: Channel?, onFull: (Channel) -> Un
                 val gd = GestureDetector(c, object : GestureDetector.SimpleOnGestureListener() {
                     override fun onDoubleTap(e: MotionEvent): Boolean {
                         current?.let { full(it) }
+                        return true
+                    }
+                    override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+                        tap()
                         return true
                     }
                 })
