@@ -29,7 +29,7 @@ const val UPDATE_REPO = "jsean327-bot/JoyPlayerPro"
 data class UpdateInfo(val build: Int, val name: String, val notes: String, val url: String, val size: Long)
 
 object Updater {
-    private val client = OkHttpClient.Builder()
+    private val client = OkHttpClient.Builder().dns(SmartDns)
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(60, TimeUnit.SECONDS)
         .build()
