@@ -30,7 +30,7 @@ class SubSettings(context: Context) {
 }
 
 object SubDl {
-    private val client = OkHttpClient.Builder()
+    private val client = OkHttpClient.Builder().dns(SmartDns)
         .connectTimeout(20, TimeUnit.SECONDS)
         .readTimeout(40, TimeUnit.SECONDS)
         .build()
