@@ -111,6 +111,7 @@ fun JoyApp() {
                 throw e
             } catch (e: Exception) {
                 error = e.message ?: "Error"
+                AppLog.add("load", "playlist \"${l0.name}\": " + (e.message ?: e.javaClass.simpleName))
             }
             loading = false
         }
