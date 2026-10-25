@@ -42,7 +42,13 @@ object AppPrefs {
 
     fun init(c: Context) {
         if (p == null) p = c.applicationContext.getSharedPreferences("joyplayer_settings", Context.MODE_PRIVATE)
+        SmartDns.mode = gi("doh", 0)
     }
+
+    /** Secure DNS: 0 = off, 1 = Cloudflare, 2 = Google, 3 = Quad9 */
+    var doh: Int
+        get() = gi("doh", 0)
+        set(v) { pi("doh", v); SmartDns.mode = v }
 
     private fun gi(k: String, d: Int): Int = p?.getInt(k, d) ?: d
     private fun pi(k: String, v: Int) { p?.edit()?.putInt(k, v)?.apply() }
@@ -369,6 +375,8 @@ fun SettingsScreen(
         "auto" to "⚙️  Automatic",
         "clock" to "🕒  Time Format",
         "sub" to "💬  Subtitle Settings",
+        "doh" to "🛡️  Secure DNS (DoH)",
+        "log" to "🪲  Error Log",
         "pip" to "🖼️  PIP Settings",
         "epg" to "📅  EPG (XMLTV)",
         "backup" to "💾  Backup & Restore",
@@ -684,6 +692,41 @@ fun SettingsScreen(
             }
         }
         "pip" -> PipDialog { dialog = "" }
+        "log" -> ErrorLogDialog { dialog = "" }
+        "doh" -> SDialog("Secure DNS (DoH)", { dialog = "" }, maxHeight = 420.dp) {
+            var mode by remember { mutableStateOf(AppPrefs.doh) }
+            var res by remember { mutableStateOf<String?>(null) }
+            val scope = rememberCoroutineScope()
+            Text(
+                "Helps when your internet provider blocks or breaks the address of your IPTV server. " +
+                    "If the secure lookup fails, the normal DNS is used automatically.",
+                color = C.Text, fontSize = 13.sp
+            )
+            listOf("Off (system DNS)", "Cloudflare (1.1.1.1)", "Google (8.8.8.8)", "Quad9 (9.9.9.9)").forEachIndexed { i, n ->
+                SOpt(n, mode == i) { mode = i; AppPrefs.doh = i }
+            }
+            val host = active?.server?.takeIf { it.isNotBlank() }?.let {
+                runCatching { java.net.URI(if (it.startsWith("http")) it else "http://$it").host }.getOrNull()
+            }
+            if (host != null) {
+                Button(
+                    onClick = {
+                        scope.launch {
+                            res = "..."
+                            res = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                val a = runCatching { okhttp3.Dns.SYSTEM.lookup(host).joinToString { it.hostAddress ?: "" } }
+                                    .getOrElse { "✗ " + (it.message ?: "failed") }
+                                val b = runCatching { SmartDns.secureLookup(host).joinToString { it.hostAddress ?: "" } }
+                                    .getOrElse { "✗ " + (it.message ?: "failed") }
+                                "System DNS: $a\nSecure DNS: $b"
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy)
+                ) { Text("Test my server address") }
+            }
+            res?.let { Text(it, color = Color(0xFFFFD54F), fontSize = 12.sp) }
+        }
         "backup" -> BackupDialog { dialog = "" }
         "cache" -> CacheDialog { dialog = "" }
         "epg" -> SDialog("EPG (XMLTV)", { dialog = "" }, maxHeight = 380.dp) {
