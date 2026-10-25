@@ -764,7 +764,12 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     .clip(RoundedCornerShape(8.dp)).background(Color(0xCC000000)).padding(8.dp)
             )
         }
-        if (!hasMeta && overlay && dialog.isEmpty() && !PipState.inPip) {
+        // the program info fades away a few seconds after the channel opens / the controls appear
+        var badgeOn by remember(ch.url) { mutableStateOf(true) }
+        LaunchedEffect(ch.url, overlay) {
+            if (overlay) { badgeOn = true; kotlinx.coroutines.delay(6000); badgeOn = false }
+        }
+        if (!hasMeta && overlay && badgeOn && dialog.isEmpty() && !PipState.inPip) {
             val narrow = rememberIsCompact()
             EpgBadge(
                 ch,
