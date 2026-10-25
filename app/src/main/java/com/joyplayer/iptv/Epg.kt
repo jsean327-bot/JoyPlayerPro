@@ -74,9 +74,13 @@ object Epg {
                         "&action=get_simple_data_table&stream_id=$id"
             ).header("User-Agent", "VLC/3.0.18 LibVLC/3.0.18").build()
             http.newBuilder().readTimeout(20, TimeUnit.SECONDS).build().newCall(req).execute().use { r ->
-                if (!r.isSuccessful) return@withContext emptyList()
-                val arr = JsonParser.parseString(r.body?.string().orEmpty()).asJsonObject.getAsJsonArray("epg_listings")
-                    ?: return@withContext emptyList()
+                if (!r.isSuccessful) { AppLog.add("epg", "full HTTP ${r.code} for stream $id"); return@withContext emptyList() }
+                val txt = r.body?.string().orEmpty()
+                val arr = JsonParser.parseString(txt).asJsonObject.getAsJsonArray("epg_listings")
+                if (arr == null || arr.size() == 0) {
+                    AppLog.add("epg", "full: no listings for stream $id, answer: " + txt.take(120))
+                    return@withContext emptyList()
+                }
                 val list = arr.mapNotNull { e ->
                     val o = e.asJsonObject
                     val st = o.str("start_timestamp").toLongOrNull() ?: return@mapNotNull null
@@ -87,6 +91,7 @@ object Epg {
                 list
             }
         } catch (e: Exception) {
+            AppLog.add("epg", "full error: " + e.javaClass.simpleName + " " + (e.message ?: ""))
             emptyList()
         }
     }
@@ -116,10 +121,13 @@ object Epg {
                         "&action=get_short_epg&stream_id=$id&limit=12"
             ).header("User-Agent", "VLC/3.0.18 LibVLC/3.0.18").build()
             http.newCall(req).execute().use { r ->
-                if (!r.isSuccessful) return@withContext emptyList()
+                if (!r.isSuccessful) { AppLog.add("epg", "short HTTP ${r.code} for stream $id"); return@withContext emptyList() }
                 val body = r.body?.string().orEmpty()
                 val arr = JsonParser.parseString(body).asJsonObject.getAsJsonArray("epg_listings")
-                    ?: return@withContext emptyList()
+                if (arr == null || arr.size() == 0) {
+                    AppLog.add("epg", "short: no listings for stream $id, answer: " + body.take(120))
+                    return@withContext emptyList()
+                }
                 val list = arr.mapNotNull { e ->
                     val o = e.asJsonObject
                     val st = o.str("start_timestamp").toLongOrNull() ?: return@mapNotNull null
@@ -130,6 +138,7 @@ object Epg {
                 list
             }
         } catch (e: Exception) {
+            AppLog.add("epg", "short error: " + e.javaClass.simpleName + " " + (e.message ?: ""))
             emptyList()
         }
     }
