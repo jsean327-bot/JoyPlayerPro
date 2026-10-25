@@ -56,7 +56,7 @@ object PlayerFactory {
     var reconnecting by mutableStateOf(0)
 
     // Same HTTP stack (OkHttp) the app already uses for the playlist / account calls.
-    private val okClient = OkHttpClient.Builder()
+    private val okClient = OkHttpClient.Builder().dns(SmartDns)
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)
@@ -152,6 +152,7 @@ object PlayerFactory {
             r = fresh
         }
         if (io && r != null && r.next(player, error)) return
+        AppLog.add("play", describe(error) + " | " + cur + (if (lastDiag.isNotEmpty()) " | " + lastDiag.replace('\n', ' ').take(200) else ""))
         val extra = if (lastDiag.isNotEmpty()) "  (details on the fullscreen player)" else ""
         if (reconnecting == 0) Toast.makeText(ctx, "Playback failed: ${describe(error)}$extra", Toast.LENGTH_LONG).show()
     }
