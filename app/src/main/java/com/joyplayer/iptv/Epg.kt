@@ -38,7 +38,7 @@ data class EpgItem(val title: String, val desc: String, val start: Long, val end
 
 /** Program guide (EPG) for Xtream live channels, read from the server's get_short_epg. */
 object Epg {
-    private val http = OkHttpClient.Builder()
+    private val http = OkHttpClient.Builder().dns(SmartDns)
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
