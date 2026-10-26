@@ -66,7 +66,7 @@ val JoyColors = darkColorScheme(
 class FavStore(context: Context) {
     private val prefs = context.getSharedPreferences("joyplayer_fav", Context.MODE_PRIVATE)
     fun load(): Set<String> = prefs.getStringSet("fav", emptySet())?.toSet() ?: emptySet()
-    fun save(s: Set<String>) { prefs.edit().putStringSet("fav", s).apply() }
+    fun save(s: Set<String>) { prefs.edit().putStringSet("fav", s.map { Creds.strip(it) }.toSet()).apply() }
 }
 
 @Composable
