@@ -91,14 +91,30 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     LaunchedEffect(loading, open) {
         if (!loading && open == null && !firstDone && lastOpen == null) {
             kotlinx.coroutines.delay(400)
-            runCatching { firstFocus.requestFocus() }
+            var tries = 0
+            while (tries < 20 && runCatching { firstFocus.requestFocus() }.isFailure) {
+                kotlinx.coroutines.delay(100)
+                tries++
+            }
             firstDone = true
         }
     }
     LaunchedEffect(open) {
         if (open == null && lastOpen != null) {
-            kotlinx.coroutines.delay(350)
-            runCatching { backFocus.requestFocus() }
+            // slow devices (Fire TV Stick) need longer to draw the list again: keep trying until the poster can take the cursor,
+            // then ask once more in case the system moved the cursor away while the screen was changing
+            kotlinx.coroutines.delay(250)
+            var ok = false
+            var tries = 0
+            while (!ok && tries < 40) {
+                ok = runCatching { backFocus.requestFocus() }.isSuccess
+                if (!ok) kotlinx.coroutines.delay(100)
+                tries++
+            }
+            if (ok) {
+                kotlinx.coroutines.delay(400)
+                runCatching { backFocus.requestFocus() }
+            }
         }
     }
 
