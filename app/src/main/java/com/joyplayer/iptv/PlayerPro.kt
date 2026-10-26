@@ -306,6 +306,31 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     var boxFocused by remember { mutableStateOf(false) }
     var pv by remember { mutableStateOf<PlayerView?>(null) }
 
+    // Picture watchdog for the player shared with the small preview: when the video is moved to the big
+    // screen it can stay black until the next picture arrives. If no picture shows up, re-attach the surface,
+    // then ask for a fresh picture.
+    var frame by remember(ch.url) { mutableStateOf(false) }
+    DisposableEffect(player) {
+        val l = object : Player.Listener {
+            override fun onRenderedFirstFrame() { frame = true }
+        }
+        player.addListener(l)
+        onDispose { player.removeListener(l) }
+    }
+    LaunchedEffect(player, pv) {
+        if (shared == null || pv == null) return@LaunchedEffect
+        delay(1200)
+        if (!frame && player.playbackState == Player.STATE_READY) {
+            pv?.player = null; pv?.player = player
+            AppLog.add("video", "black picture after enlarging: surface re-attached")
+        }
+        delay(2000)
+        if (!frame && player.playbackState == Player.STATE_READY) {
+            player.seekToDefaultPosition()
+            AppLog.add("video", "black picture after enlarging: asked for a fresh picture")
+        }
+    }
+
     // Live channel zapping (inside the list the user was browsing)
     val canZap = !hasMeta && LiveZap.list.size > 1
     fun goTo(n: Channel, num: Int) {
