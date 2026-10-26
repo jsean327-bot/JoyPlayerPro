@@ -36,12 +36,20 @@ object SharedLive {
 fun rememberLivePlayer(sel: Channel?, paused: Boolean): ExoPlayer {
     val ctx = LocalContext.current
     val player = remember { PlayerFactory.create(ctx) }
+    val opened = remember { LongArray(1) }   // when the last channel was asked for (to log how long it took)
     DisposableEffect(Unit) {
         SharedLive.player = player
         val retries = HashMap<String, StreamRetry>()
         val l = object : Player.Listener {
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) { retries.clear(); PlayerFactory.lastDiag = "" }
+                if (state == Player.STATE_READY) {
+                    retries.clear(); PlayerFactory.lastDiag = ""
+                    if (opened[0] > 0L) {
+                        val ms = android.os.SystemClock.elapsedRealtime() - opened[0]
+                        opened[0] = 0L
+                        AppLog.add("speed", "channel started in $ms ms")
+                    }
+                }
             }
             override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                 val cur = player.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
@@ -67,6 +75,7 @@ fun rememberLivePlayer(sel: Channel?, paused: Boolean): ExoPlayer {
             val want = AppPrefs.fmtUrl(sel.url)
             val cur = player.currentMediaItem?.localConfiguration?.uri?.toString()
             if (cur != want || player.playbackState == Player.STATE_IDLE) {
+                opened[0] = android.os.SystemClock.elapsedRealtime()
                 player.setMediaItem(MediaItem.fromUri(want))
                 player.prepare()
             }
