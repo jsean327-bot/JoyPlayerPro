@@ -32,6 +32,13 @@ object SmartList {
 
     fun fetchM3u(url: String): List<Channel> {
         lastEpg = ""
+        if (url.trim().startsWith("file:")) {            // a file picked on this device
+            val f = java.io.File(url.trim().removePrefix("file://").removePrefix("file:"))
+            if (!f.exists()) error("The playlist file is missing. Add it again from Change Playlist.")
+            val out = f.bufferedReader(Charsets.UTF_8).useLines { parseLines(it) }
+            if (out.isEmpty()) error("No channels found in this file")
+            return out
+        }
         val req = Request.Builder().url(url.trim())
             .header("User-Agent", "VLC/3.0.18 LibVLC/3.0.18").build()
         client.newCall(req).execute().use { r ->
