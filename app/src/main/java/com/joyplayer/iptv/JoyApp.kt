@@ -103,6 +103,13 @@ fun JoyApp() {
                     }
                 }
                 channels = res; active = l
+                // saved favorites / history carry no password: fill in this account's, and rewrite old ones without it
+                Creds.set(l)
+                favs = favs.map { Creds.fill(it) }.toSet()
+                favStore.save(favs)
+                AppPrefs.recentLive = AppPrefs.recentLive
+                ResumeStore.init(ctx)
+                ResumeStore.migrate()
                 Preload.vod(l)
                 XmlTv.activeUrl = AppPrefs.epgUrl(l.id)
                 prefs.edit().putString("last", l0.id).apply()
