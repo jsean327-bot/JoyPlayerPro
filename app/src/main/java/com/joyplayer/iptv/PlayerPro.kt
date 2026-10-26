@@ -949,19 +949,14 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     initialFirstVisibleItemIndex = (curIdx - 3).coerceAtLeast(0)
                 )
                 val curFr = remember { FocusRequester() }
-                var idleTick by remember { mutableStateOf(0) }
-                LaunchedEffect(Unit) {
+                // the list stays open (Back / Exit closes it); after a channel change the cursor follows the new channel
+                LaunchedEffect(curIdx) {
                     delay(120)
                     runCatching { curFr.requestFocus() }
-                }
-                LaunchedEffect(idleTick) {          // close by itself after 4 s without a key press
-                    delay(4000)
-                    dlgBack()
                 }
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                     Column(
                         Modifier.fillMaxHeight().width(340.dp)
-                            .onPreviewKeyEvent { e -> if (e.type == KeyEventType.KeyDown) idleTick++; false }
                             .background(Color(0xE60E0B24)).padding(vertical = 12.dp)
                     ) {
                         Text(
@@ -983,7 +978,6 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                                         .clip(RoundedCornerShape(8.dp))
                                         .background(if (isCur) C.Burgundy else Color(0x33FFFFFF))
                                         .clickable {
-                                            dlgBack()
                                             if (!isCur) goTo(c, i + 1)
                                         }
                                         .padding(horizontal = 12.dp, vertical = 10.dp),
