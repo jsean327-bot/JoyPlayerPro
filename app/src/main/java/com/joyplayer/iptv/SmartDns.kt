@@ -41,16 +41,50 @@ object SmartDns : Dns {
         return d.lookup(host)
     }
 
+    // last answers that worked (kept on the device): used when every DNS fails, e.g. "No address associated with hostname"
+    private var store: android.content.SharedPreferences? = null
+    private val lastGood = java.util.concurrent.ConcurrentHashMap<String, List<String>>()
+
+    fun init(ctx: android.content.Context) {
+        if (store != null) return
+        val p = ctx.applicationContext.getSharedPreferences("joyplayer_dns", android.content.Context.MODE_PRIVATE)
+        store = p
+        for ((k, v) in p.all) (v as? String)?.let { lastGood[k] = it.split(",").filter { x -> x.isNotBlank() } }
+    }
+
+    private fun remember(host: String, list: List<InetAddress>) {
+        val ips = list.mapNotNull { it.hostAddress }
+        if (ips.isEmpty() || lastGood[host] == ips) return
+        lastGood[host] = ips
+        store?.edit()?.putString(host, ips.joinToString(","))?.apply()
+    }
+
+    private fun tryDoh(m: Int, host: String): List<InetAddress>? = try {
+        doh(m)?.lookup(host)?.takeIf { it.isNotEmpty() }
+    } catch (e: Exception) { null }
+
     override fun lookup(hostname: String): List<InetAddress> {
         val m = mode
-        if (m != 0) {
-            try {
-                val r = doh(m)?.lookup(hostname).orEmpty()
-                if (r.isNotEmpty()) return r
-            } catch (e: Exception) {
-                // fall back to the system DNS below
+        var sysError: Exception? = null
+        if (m != 0) tryDoh(m, hostname)?.let { remember(hostname, it); return it }
+        try {
+            val r = Dns.SYSTEM.lookup(hostname)
+            if (r.isNotEmpty()) { remember(hostname, r); return r }
+        } catch (e: Exception) {
+            sysError = e
+        }
+        // the normal DNS failed: ask secure DNS servers by themselves, then use the last good answer
+        for (alt in listOf(1, 2, 3)) {
+            if (alt == m) continue
+            tryDoh(alt, hostname)?.let {
+                AppLog.add("dns", "system DNS failed for $hostname, secure DNS answered")
+                remember(hostname, it); return it
             }
         }
-        return Dns.SYSTEM.lookup(hostname)
+        lastGood[hostname]?.takeIf { it.isNotEmpty() }?.let { ips ->
+            AppLog.add("dns", "all DNS failed for $hostname, using the last known address")
+            return ips.map { InetAddress.getByName(it) }
+        }
+        throw (sysError ?: java.net.UnknownHostException(hostname))
     }
 }
