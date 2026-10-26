@@ -109,6 +109,8 @@ fun LivePreviewSurface(player: ExoPlayer, sel: Channel?, onFull: (Channel) -> Un
                 setOnTouchListener { _, e -> gd.onTouchEvent(e); true }
             }
         },
+        // the phone screen stays on while a channel is shown in the small preview
+        update = { it.keepScreenOn = sel != null },
         modifier = Modifier.fillMaxSize()
     )
 }
