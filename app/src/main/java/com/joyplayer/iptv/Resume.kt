@@ -36,7 +36,20 @@ object ResumeStore {
         )
     }
 
-    private fun read(url: String): Entry? = parse(prefs?.getString(url, null))
+    private fun read(url: String): Entry? =
+        parse(prefs?.getString(Creds.strip(url), null) ?: prefs?.getString(url, null))
+
+    /** Moves positions saved with a full link (old versions) to the password-free key. */
+    fun migrate() {
+        val pr = prefs ?: return
+        val ed = pr.edit()
+        var any = false
+        for ((k, v) in pr.all) {
+            val nk = Creds.strip(k)
+            if (nk != k && v is String) { ed.remove(k); ed.putString(nk, v); any = true }
+        }
+        if (any) ed.apply()
+    }
 
     private fun clean(s: String?): String = (s ?: "").replace("|", " ").replace(SEP, ' ')
 
@@ -54,6 +67,7 @@ object ResumeStore {
     fun save(url: String, pos: Long, dur: Long, name: String = "", logo: String? = null, notify: Boolean = true) {
         val pr = prefs ?: return
         if (dur <= 0L || pos < 0L) return
+        val key = Creds.strip(url)
         val now = System.currentTimeMillis()
         val old = read(url)
         val nm = clean(name).ifBlank { old?.name.orEmpty() }
@@ -61,8 +75,8 @@ object ResumeStore {
         val tail = "$nm$SEP$lg"
         val finished = pos >= dur * 95 / 100
         when {
-            finished -> pr.edit().putString(url, "0|$dur|$now|1|$tail").apply()
-            pos > 10_000L -> pr.edit().putString(url, "$pos|$dur|$now|0|$tail").apply()
+            finished -> pr.edit().putString(key, "0|$dur|$now|1|$tail").apply()
+            pos > 10_000L -> pr.edit().putString(key, "$pos|$dur|$now|0|$tail").apply()
             else -> return
         }
         prune(pr)
@@ -78,7 +92,7 @@ object ResumeStore {
             val e = parse(v as? String) ?: return@mapNotNull null
             if (e.done || e.pos <= 0L || e.name.isBlank()) null else Triple(k, e, e.ts)
         }.sortedByDescending { it.third }.take(limit).map { (k, e, _) ->
-            Recent(k, e.name, e.logo.ifBlank { null }, e.pos, e.dur)
+            Recent(Creds.fill(k), e.name, e.logo.ifBlank { null }, e.pos, e.dur)
         }
     }
 
