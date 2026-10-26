@@ -29,10 +29,7 @@ android {
             if (ks.exists()) signingConfig = signingConfigs.getByName("joy")
             // optimized build: not debuggable (faster, same install / update)
             isDebuggable = false
-            // R8 in SAFE mode: only removes unused library code (no obfuscation, no code optimisation).
-            // If anything misbehaves, set isMinifyEnabled back to false.
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro")
+            isMinifyEnabled = false   // R8 shrinking is off for now (it broke Movies / Series)
         }
         release { isMinifyEnabled = false }
     }
