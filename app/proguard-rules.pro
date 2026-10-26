@@ -15,3 +15,8 @@
 -dontwarn org.openjsse.**
 -dontwarn javax.annotation.**
 -dontwarn kotlin.Unit
+-dontwarn com.google.errorprone.annotations.**
+-dontwarn javax.lang.model.**
+-dontwarn org.codehaus.mojo.animal_sniffer.**
+-dontwarn java.lang.invoke.StringConcatFactory
+-ignorewarnings
