@@ -192,8 +192,8 @@ object AppPrefs {
     fun setLocked(kind: String, listId: String, v: Set<String>) { ps("lock_${kind}_$listId", v) }
 
     var recentLive: List<String>
-        get() = (p?.getString("recent_live", "") ?: "").split("\n").filter { it.isNotBlank() }
-        set(v) { p?.edit()?.putString("recent_live", v.joinToString("\n"))?.apply() }
+        get() = (p?.getString("recent_live", "") ?: "").split("\n").filter { it.isNotBlank() }.map { Creds.fill(it) }
+        set(v) { p?.edit()?.putString("recent_live", v.joinToString("\n") { Creds.strip(it) })?.apply() }
 
     fun fmtUrl(u: String): String {
         if (!u.contains("/live/")) return u
