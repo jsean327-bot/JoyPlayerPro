@@ -355,6 +355,21 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
         goTo(list[idx], idx + 1)
     }
 
+    // the big player's |< and >| buttons switch channels (live); read the newest state when clicked
+    val zapNow = rememberUpdatedState<(Int) -> Unit>({ d -> zap(d) })
+    val canZapNow = rememberUpdatedState(canZap)
+    LaunchedEffect(pv, canZap) {
+        val v = pv ?: return@LaunchedEffect
+        if (!canZap) return@LaunchedEffect
+        val res = ctx.resources
+        val ids = listOf("exo_prev", "exo_next").map { res.getIdentifier(it, "id", ctx.packageName) }
+        // the player dims these buttons for a live stream: keep them lit so they can be pressed
+        while (true) {
+            ids.forEach { id -> if (id != 0) v.findViewById<View>(id)?.let { b -> b.isEnabled = true; b.alpha = 1f } }
+            delay(300)
+        }
+    }
+
     // Number keys on the remote: type a channel number (its position in the list), 0 = previous channel
     var numBuf by remember { mutableStateOf("") }
 
@@ -610,6 +625,14 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     // the player's gear opens our settings menu
                     val gearId = c.resources.getIdentifier("exo_settings", "id", c.packageName)
                     if (gearId != 0) findViewById<View>(gearId)?.setOnClickListener { openMenu() }
+                    val prevId = c.resources.getIdentifier("exo_prev", "id", c.packageName)
+                    val nextId = c.resources.getIdentifier("exo_next", "id", c.packageName)
+                    if (prevId != 0) findViewById<View>(prevId)?.setOnClickListener {
+                        if (canZapNow.value) zapNow.value(-1) else exo.seekToPrevious()
+                    }
+                    if (nextId != 0) findViewById<View>(nextId)?.setOnClickListener {
+                        if (canZapNow.value) zapNow.value(1) else exo.seekToNext()
+                    }
                     layoutParams = ViewGroup.LayoutParams(
                         ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
                     )
