@@ -67,6 +67,8 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     var error by remember(key) { mutableStateOf<String?>(null) }
     var favs by remember(key) { mutableStateOf(store.favs(key)) }
     var recents by remember(key) { mutableStateOf(store.recents(key)) }
+    ResumeStore.init(ctx)
+    val resumeVer = ResumeStore.version   // refreshes the "watched" marks after you watch something
     var cat by remember(key) { mutableStateOf("*all*") }
     var query by remember { mutableStateOf("") }
     var order by remember { mutableStateOf(0) }
@@ -302,7 +304,8 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                         } else false
                     }
                     val base = if (item.id.toString() == lastOpen) Modifier.focusRequester(backFocus) else if (item === shown.firstOrNull()) Modifier.focusRequester(firstFocus) else Modifier
-                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, base.then(nav))
+                    val seen = !isSeries && list != null && resumeVer >= 0 && ResumeStore.isDone(item.playUrl(list))
+                    PosterCard(item, item.id.toString() in favs, { openItem(item) }, { toggleFav(item) }, base.then(nav), seen)
                 }
             }
         }
@@ -402,7 +405,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit, focusMod: Modifier = Modifier) {
+fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Unit, focusMod: Modifier = Modifier, watched: Boolean = false) {
     Column(
         focusMod.clip(RoundedCornerShape(8.dp)).background(Color(0xFF3A1B2E))
             .combinedClickable(onLongClick = onFav, onClick = onClick)
@@ -412,6 +415,11 @@ fun PosterCard(item: LibItem, fav: Boolean, onClick: () -> Unit, onFav: () -> Un
             Text(
                 if (fav) "★" else "☆", color = Color(0xFFFFD54F), fontSize = 20.sp,
                 modifier = Modifier.align(Alignment.TopEnd).clickable(onClick = onFav).padding(6.dp)
+            )
+            if (watched) Text(
+                "✓", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.align(Alignment.TopStart).padding(5.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape).background(Color(0xFF2E9E5B)).padding(horizontal = 6.dp, vertical = 1.dp)
             )
             Text(
                 "%.1f".format(item.rating), color = Color.White, fontSize = 10.sp,
