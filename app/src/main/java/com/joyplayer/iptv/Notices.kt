@@ -3,7 +3,14 @@ package com.joyplayer.iptv
 import android.content.Context
 import android.os.Build
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -78,6 +85,56 @@ object Notices {
     }
 }
 
+object UpdatePromptState { var done = false }
+
+/** At every app start: if a newer version exists, ask (optionally) to update. The cursor starts on "Update". */
+@Composable
+fun UpdatePrompt() {
+    val ctx = LocalContext.current
+    var info by remember { mutableStateOf<UpdateInfo?>(null) }
+    var install by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        if (UpdatePromptState.done) return@LaunchedEffect
+        UpdatePromptState.done = true
+        delay(1500)
+        try {
+            val i = withContext(Dispatchers.IO) { Updater.latest() }
+            if (i.build > Updater.installedBuild(ctx)) info = i
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // offline: no prompt
+        }
+    }
+    val i = info
+    if (install) {
+        UpdateDialog { install = false; info = null }
+    } else if (i != null) {
+        val focus = remember { FocusRequester() }
+        LaunchedEffect(Unit) { delay(250); runCatching { focus.requestFocus() } }
+        val ar = Lang.code == "ar"
+        SDialog(if (ar) "تحديث جديد متوفر" else "New update available", { info = null }, maxHeight = 300.dp) {
+            Text("${i.name}  (build ${i.build})", color = Color(0xFFFFD54F), fontSize = 14.sp)
+            if (i.notes.isNotBlank()) Text(i.notes.take(200), color = Color(0xFFEAF0FF), fontSize = 12.sp)
+            Text(
+                if (ar) "هل تريد التحديث الآن؟ (اختياري)" else "Do you want to update now? (optional)",
+                color = Color.White, fontSize = 13.sp
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { install = true },
+                    modifier = Modifier.focusRequester(focus),
+                    colors = ButtonDefaults.buttonColors(containerColor = C.Blue)
+                ) { Text(if (ar) "تحديث" else "Update") }
+                Button(
+                    onClick = { info = null },
+                    colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark)
+                ) { Text(if (ar) "لاحقاً" else "Later") }
+            }
+        }
+    }
+}
+
 @Composable
 fun HomeNotices(list: SavedList?, modifier: Modifier = Modifier) {
     val ctx = LocalContext.current
@@ -85,7 +142,7 @@ fun HomeNotices(list: SavedList?, modifier: Modifier = Modifier) {
     var update by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(list?.id) { expiry = Notices.expiryText(list) }
     LaunchedEffect(Unit) { update = Notices.updateText(ctx) }
-    Column(modifier.padding(16.dp), verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(6.dp)) {
+    Column(modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         expiry?.let { (t, red) -> NoticePill(t, if (red) Color(0xCCB3261E) else Color(0xCC8A5A00)) }
         update?.let { NoticePill(it, Color(0xCC1B5E20)) }
     }
