@@ -7,7 +7,7 @@ android {
     compileSdk = 34
     defaultConfig {
         applicationId = "com.joyplayer.iptv"
-        minSdk = 23
+        minSdk = 22
         targetSdk = 34
         val vc = (project.findProperty("vcode") as String?)?.toIntOrNull() ?: 1
         versionCode = vc
