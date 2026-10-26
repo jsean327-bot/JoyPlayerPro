@@ -77,6 +77,33 @@ fun AddScreen(loading: Boolean, error: String?, onSave: (SavedList) -> Unit) {
     var server by remember { mutableStateOf("") }
     var user by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
+    val ctx = LocalContext.current
+    var note by remember { mutableStateOf<String?>(null) }
+    // an M3U file chosen on this device (or pasted) is copied inside the app and used like a link
+    fun importM3u(bytes: ByteArray, fileName: String?) {
+        val head = String(bytes, 0, minOf(bytes.size, 6000), Charsets.UTF_8)
+        if (!head.contains("#EXTM3U") && !head.contains("#EXTINF")) { note = "✗ This does not look like an M3U playlist"; return }
+        val dir = java.io.File(ctx.filesDir, "m3u").apply { mkdirs() }
+        val f = java.io.File(dir, "pl_" + System.currentTimeMillis() + ".m3u")
+        f.writeBytes(bytes)
+        url = "file://" + f.absolutePath
+        if (name.isBlank() && !fileName.isNullOrBlank()) name = fileName
+        val n = Regex("#EXTINF").findAll(String(bytes, Charsets.UTF_8)).count()
+        note = "✓ Playlist loaded: $n channels. Press Save & Load."
+    }
+    val pick = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri: android.net.Uri? ->
+        if (uri != null) {
+            try {
+                val bytes = ctx.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: error("Cannot read the file")
+                if (bytes.size > 40_000_000) error("File is too large")
+                importM3u(bytes, uri.lastPathSegment?.substringAfterLast('/')?.substringBeforeLast('.'))
+            } catch (e: Exception) {
+                note = "✗ " + (e.message ?: "Could not read the file")
+            }
+        }
+    }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp)) {
         Text("JoyPlayer IPTV", style = MaterialTheme.typography.headlineLarge)
         Spacer(Modifier.height(16.dp))
@@ -88,6 +115,18 @@ fun AddScreen(loading: Boolean, error: String?, onSave: (SavedList) -> Unit) {
         OutlinedTextField(name, { name = it }, label = { Text("List name") }, singleLine = true, modifier = Modifier.fillMaxWidth())
         if (tab == 0) {
             OutlinedTextField(url, { url = it }, label = { Text("M3U URL") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+                OutlinedButton(onClick = {
+                    try { pick.launch(arrayOf("*/*")) }
+                    catch (e: Exception) { note = "✗ No file manager found on this device. Use a link or paste from the clipboard." }
+                }) { Text("📁  Choose M3U file") }
+                OutlinedButton(onClick = {
+                    val cm = ctx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    val t = cm.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(ctx)?.toString().orEmpty()
+                    if (t.isBlank()) note = "✗ The clipboard is empty" else importM3u(t.toByteArray(Charsets.UTF_8), null)
+                }) { Text("📋  Paste from clipboard") }
+            }
+            note?.let { Text(it, color = if (it.startsWith("✓")) androidx.compose.ui.graphics.Color(0xFF6EE7A0) else MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 6.dp)) }
         } else {
             OutlinedTextField(server, { server = it }, label = { Text("Server (http://host:port)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
             OutlinedTextField(user, { user = it }, label = { Text("Username") }, singleLine = true, modifier = Modifier.fillMaxWidth())
