@@ -212,6 +212,7 @@ fun JoyApp() {
               )
             }
         }
+        UpdatePrompt()
         if (confirmExit) {
             // the cursor starts on "Yes"
             val yesFocus = remember { FocusRequester() }
