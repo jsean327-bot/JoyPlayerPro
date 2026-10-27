@@ -14,6 +14,7 @@ import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -85,7 +86,7 @@ object Notices {
     }
 }
 
-object UpdatePromptState { var done = false }
+object UpdatePromptState { var last = 0L }
 
 /** At every app start: if a newer version exists, ask (optionally) to update. The cursor starts on "Update". */
 @Composable
@@ -93,9 +94,20 @@ fun UpdatePrompt() {
     val ctx = LocalContext.current
     var info by remember { mutableStateOf<UpdateInfo?>(null) }
     var install by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) {
-        if (UpdatePromptState.done) return@LaunchedEffect
-        UpdatePromptState.done = true
+    // the app is often only sent to the background (Home button) and brought back: ask again each time it comes to the front
+    var visit by remember { mutableStateOf(0) }
+    DisposableEffect(ctx) {
+        val lc = (ctx as? androidx.lifecycle.LifecycleOwner)?.lifecycle
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_START) visit++
+        }
+        lc?.addObserver(obs)
+        onDispose { lc?.removeObserver(obs) }
+    }
+    LaunchedEffect(visit) {
+        val now = System.currentTimeMillis()
+        if (now - UpdatePromptState.last < 5 * 60_000L) return@LaunchedEffect   // not again within 5 minutes
+        UpdatePromptState.last = now
         delay(1500)
         try {
             val i = withContext(Dispatchers.IO) { Updater.latest() }
