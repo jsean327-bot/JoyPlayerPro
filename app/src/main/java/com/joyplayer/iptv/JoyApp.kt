@@ -172,7 +172,19 @@ fun JoyApp() {
                         store.save(lists)
                         if (active?.id == l.id) { active = null; channels = emptyList() }
                     },
-                    onAdd = { error = null; adding = true }
+                    onAdd = { error = null; adding = true },
+                    onMove = { l, d ->
+                        val i = lists.indexOfFirst { it.id == l.id }
+                        if (i >= 0) {
+                            val j = (i + d).coerceIn(0, lists.lastIndex)
+                            if (j != i) {
+                                val m = lists.toMutableList()
+                                m.removeAt(i); m.add(j, l)
+                                lists = m
+                                store.save(lists)
+                            }
+                        }
+                    }
                 )
             }
             screen == "account" -> AccountScreen(active) { screen = "home" }
@@ -256,7 +268,7 @@ private fun MenuBtn(label: String, onClick: () -> Unit) {
 fun PlaylistsScreen(
     lists: List<SavedList>, activeId: String?, loading: Boolean, error: String?,
     onBack: (() -> Unit)?, onConnect: (SavedList) -> Unit, onSave: (SavedList) -> Unit,
-    onDelete: (SavedList) -> Unit, onAdd: () -> Unit
+    onDelete: (SavedList) -> Unit, onAdd: () -> Unit, onMove: (SavedList, Int) -> Unit
 ) {
     var menu by remember { mutableStateOf<SavedList?>(null) }
     var edit by remember { mutableStateOf<SavedList?>(null) }
@@ -342,6 +354,15 @@ fun PlaylistsScreen(
             ) {
                 Text(l.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 MenuBtn("Connect") { menu = null; onConnect(l) }
+                val pos = lists.indexOfFirst { it.id == l.id }
+                Text(
+                    Lang.tr("Position") + "  ${pos + 1} / ${lists.size}",
+                    color = C.Text, fontSize = 13.sp
+                )
+                MenuBtn("⤒  " + Lang.tr("Move to top")) { onMove(l, -lists.size) }
+                MenuBtn("▲  " + Lang.tr("Move up")) { onMove(l, -1) }
+                MenuBtn("▼  " + Lang.tr("Move down")) { onMove(l, 1) }
+                MenuBtn("⤓  " + Lang.tr("Move to bottom")) { onMove(l, lists.size) }
                 MenuBtn("Edit") { menu = null; edit = l }
                 MenuBtn("Delete") { menu = null; del = l }
             }
