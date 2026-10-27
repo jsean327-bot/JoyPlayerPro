@@ -383,10 +383,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             Box(Modifier.weight(1f).fillMaxWidth()) { gridArea() }
         }
         if (!drawer) Box(
-            Modifier.align(androidx.compose.ui.AbsoluteAlignment.CenterRight).width(16.dp).height(72.dp)
+            Modifier.align(androidx.compose.ui.AbsoluteAlignment.CenterLeft).width(16.dp).height(72.dp)
                 .clip(RoundedCornerShape(8.dp)).background(Color(0x66FFFFFF)).clickable { drawer = true },
             contentAlignment = Alignment.Center
-        ) { Text("◂", color = Color.White, fontSize = 14.sp) }
+        ) { Text("▸", color = Color.White, fontSize = 14.sp) }
         CategoryDrawer(drawer, { drawer = false }, catOptions, cat, pickCat, toggleFavCat)
       }
     } else {
