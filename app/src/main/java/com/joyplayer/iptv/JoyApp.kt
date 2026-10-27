@@ -20,6 +20,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.zIndex
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -274,6 +278,12 @@ fun PlaylistsScreen(
     var edit by remember { mutableStateOf<SavedList?>(null) }
     var del by remember { mutableStateOf<SavedList?>(null) }
     val shape = RoundedCornerShape(10.dp)
+    // touch: long-press a playlist and drag it to another place
+    val gridState = androidx.compose.foundation.lazy.grid.rememberLazyGridState()
+    var dragId by remember { mutableStateOf<String?>(null) }
+    var drag by remember { mutableStateOf(androidx.compose.ui.geometry.Offset.Zero) }
+    val curLists by androidx.compose.runtime.rememberUpdatedState(lists)
+    val moveNow by androidx.compose.runtime.rememberUpdatedState(onMove)
 
     Column(
         Modifier.fillMaxSize()
@@ -296,12 +306,53 @@ fun PlaylistsScreen(
             GridCells.Adaptive(230.dp),
             modifier = Modifier.weight(1f).fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            state = gridState
         ) {
-            gridItems(lists) { l ->
+            gridItems(lists, key = { it.id }) { l ->
                 val isActive = l.id == activeId
+                val dragging = dragId == l.id
                 Column(
-                    Modifier.height(130.dp).clip(shape)
+                    Modifier
+                        .zIndex(if (dragging) 1f else 0f)
+                        .graphicsLayer {
+                            if (dragging) {
+                                translationX = drag.x; translationY = drag.y
+                                scaleX = 1.05f; scaleY = 1.05f; alpha = 0.92f
+                            }
+                        }
+                        .pointerInput(l.id) {
+                            var expect = -1
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { dragId = l.id; drag = androidx.compose.ui.geometry.Offset.Zero; expect = -1 },
+                                onDrag = { change, amount ->
+                                    change.consume()
+                                    drag += amount
+                                    val infos = gridState.layoutInfo.visibleItemsInfo
+                                    val me = infos.firstOrNull { it.key == l.id }
+                                    if (me != null && (expect < 0 || me.index == expect)) {
+                                        expect = -1
+                                        val cx = me.offset.x + me.size.width / 2f + drag.x
+                                        val cy = me.offset.y + me.size.height / 2f + drag.y
+                                        val hit = infos.firstOrNull {
+                                            it.index < curLists.size && it.key != l.id &&
+                                                cx >= it.offset.x && cx < it.offset.x + it.size.width &&
+                                                cy >= it.offset.y && cy < it.offset.y + it.size.height
+                                        }
+                                        if (hit != null) {
+                                            drag -= androidx.compose.ui.geometry.Offset(
+                                                (hit.offset.x - me.offset.x).toFloat(), (hit.offset.y - me.offset.y).toFloat()
+                                            )
+                                            expect = hit.index
+                                            moveNow(l, hit.index - me.index)
+                                        }
+                                    }
+                                },
+                                onDragEnd = { dragId = null; drag = androidx.compose.ui.geometry.Offset.Zero },
+                                onDragCancel = { dragId = null; drag = androidx.compose.ui.geometry.Offset.Zero }
+                            )
+                        }
+                        .height(130.dp).clip(shape)
                         .background(Brush.verticalGradient(listOf(C.Burgundy, C.BurgundyDark)))
                         .then(if (isActive) Modifier.border(2.dp, C.Blue, shape) else Modifier)
                         .clickable(enabled = !loading) { menu = l }
