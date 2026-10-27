@@ -167,6 +167,11 @@ Fullscreen|ملء الشاشة|Plein écran|Pantalla completa|Vollbild|Schermo i
 Recently watched|شوهد مؤخراً|Vus récemment|Vistos recientemente|Zuletzt gesehen|Guardati di recente|Assistidos recentemente|Недавно смотрели|Son izlenenler
 Resume to Watch|تابع المشاهدة|Reprendre la lecture|Continuar viendo|Weiterschauen|Riprendi|Continuar assistindo|Продолжить просмотр|İzlemeye devam et
 Continue Watching|متابعة المشاهدة|Reprendre la lecture|Continuar viendo|Weiterschauen|Continua a guardare|Continuar assistindo|Продолжить просмотр|İzlemeye devam et
+Position|الترتيب|Position|Posición|Position|Posizione|Posição|Позиция|Sıra
+Move to top|نقل إلى الأعلى|Placer en premier|Mover al principio|Nach oben|Sposta in alto|Mover para o topo|В начало|En üste taşı
+Move up|نقل للأعلى|Monter|Subir|Nach oben schieben|Sposta su|Mover para cima|Выше|Yukarı taşı
+Move down|نقل للأسفل|Descendre|Bajar|Nach unten schieben|Sposta giù|Mover para baixo|Ниже|Aşağı taşı
+Move to bottom|نقل إلى الأسفل|Placer en dernier|Mover al final|Nach unten|Sposta in basso|Mover para o fim|В конец|En alta taşı
 Select a channel|اختر قناة|Choisissez une chaîne|Elige un canal|Kanal auswählen|Seleziona un canale|Selecione um canal|Выберите канал|Kanal seçin
 Categories|الفئات|Catégories|Categorías|Kategorien|Categorie|Categorias|Категории|Kategoriler
 Back|رجوع|Retour|Atrás|Zurück|Indietro|Voltar|Назад|Geri
