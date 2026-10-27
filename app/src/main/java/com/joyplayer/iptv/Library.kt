@@ -25,6 +25,11 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -328,6 +333,26 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     }
 
     if (compact) {
+      // phone: swipe from the right edge to the left (or tap the small tab) to open the list of categories
+      var drawer by remember { mutableStateOf(false) }
+      Box(
+        Modifier.fillMaxSize().pointerInput(Unit) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                if (down.position.x < size.width - 40.dp.toPx()) return@awaitEachGesture
+                var dx = 0f
+                var dy = 0f
+                while (true) {
+                    val ev = awaitPointerEvent(PointerEventPass.Initial)
+                    val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                    if (!c.pressed) break
+                    val d = c.positionChange()
+                    dx += d.x; dy += d.y
+                    if (dx < -50.dp.toPx() && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.5f) { drawer = true; break }
+                }
+            }
+        }
+      ) {
         Column(Modifier.fillMaxSize().screenBg()) {
             Row(
                 Modifier.fillMaxWidth().background(Color(0x55000000))
@@ -356,6 +381,13 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             sortRow()
             Box(Modifier.weight(1f).fillMaxWidth()) { gridArea() }
         }
+        if (!drawer) Box(
+            Modifier.align(androidx.compose.ui.AbsoluteAlignment.CenterRight).width(16.dp).height(72.dp)
+                .clip(RoundedCornerShape(8.dp)).background(Color(0x66FFFFFF)).clickable { drawer = true },
+            contentAlignment = Alignment.Center
+        ) { Text("◂", color = Color.White, fontSize = 14.sp) }
+        CategoryDrawer(drawer, { drawer = false }, catOptions, cat, pickCat, toggleFavCat)
+      }
     } else {
         Column(Modifier.fillMaxSize().screenBg()) {
             Row(
@@ -416,6 +448,38 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
             onOk = { Parental.opened.add("$kind|${list?.id}|$c"); cat = c; pinFor = null },
             onDismiss = { pinFor = null }
         )
+    }
+}
+
+/** Slide-in list of categories for the phone (opened by a swipe from the right edge). */
+@Composable
+private fun CategoryDrawer(
+    open: Boolean, onClose: () -> Unit, options: List<CatOpt>, cat: String,
+    onPick: (String) -> Unit, onStar: (String) -> Unit
+) {
+    if (!open) return
+    BackHandler { onClose() }
+    Box(Modifier.fillMaxSize()) {
+        Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { onClose() })
+        Column(
+            Modifier.align(androidx.compose.ui.AbsoluteAlignment.CenterRight).fillMaxHeight().width(300.dp)
+                .background(Color(0xF2140F2E))
+                .pointerInput(Unit) { detectHorizontalDragGestures { change, dx -> if (dx > 12f) { change.consume(); onClose() } } }
+                .padding(vertical = 10.dp, horizontal = 6.dp)
+        ) {
+            Text(
+                "Categories", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp,
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)
+            )
+            LazyColumn {
+                items(options, key = { it.key }) { o ->
+                    CatRow(
+                        o.label, o.count, cat == o.key,
+                        onLongClick = if (o.key.startsWith("*")) null else ({ onStar(o.key) })
+                    ) { onPick(o.key); onClose() }
+                }
+            }
+        }
     }
 }
 
