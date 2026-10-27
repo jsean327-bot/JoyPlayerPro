@@ -21,7 +21,8 @@ object SmartList {
         val port = if (u.port != -1) ":${u.port}" else ""
         return l.copy(
             type = "xtream",
-            server = "${u.scheme ?: "http"}://$host$port",
+            // "https" on a plain port (e.g. :80 / :8080) is a typo that ends in "Unable to parse TLS packet header"
+            server = "${if (u.scheme == "https" && u.port != -1 && u.port != 443 && u.port != 8443) "http" else (u.scheme ?: "http")}://$host$port",
             user = user,
             pass = pass
         )
