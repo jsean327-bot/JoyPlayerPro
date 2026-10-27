@@ -336,11 +336,14 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
     if (compact) {
       // phone: swipe from the right edge to the left (or tap the small tab) to open the list of categories
       var drawer by remember { mutableStateOf(false) }
+      var drawerRight by remember { mutableStateOf(false) }
       Box(
         Modifier.fillMaxSize().pointerInput(Unit) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
-                if (down.position.x < size.width - 40.dp.toPx()) return@awaitEachGesture
+                // not from the fast-scroll strip on the right edge (it would move too)
+                if (down.position.x > size.width - 44.dp.toPx()) return@awaitEachGesture
+                val fromLeftEdge = down.position.x < 36.dp.toPx()
                 var dx = 0f
                 var dy = 0f
                 while (true) {
@@ -349,7 +352,11 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
                     if (!c.pressed) break
                     val d = c.positionChange()
                     dx += d.x; dy += d.y
-                    if (dx < -50.dp.toPx() && kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.5f) { drawer = true; break }
+                    if (kotlin.math.abs(dx) > kotlin.math.abs(dy) * 1.5f) {
+                        // swipe to the left: list slides in from the right; swipe to the right from the left edge: from the left
+                        if (dx < -80.dp.toPx()) { drawerRight = true; drawer = true; break }
+                        if (fromLeftEdge && dx > 60.dp.toPx()) { drawerRight = false; drawer = true; break }
+                    }
                 }
             }
         }
@@ -384,10 +391,10 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
         }
         if (!drawer) Box(
             Modifier.align(androidx.compose.ui.AbsoluteAlignment.CenterLeft).width(16.dp).height(72.dp)
-                .clip(RoundedCornerShape(8.dp)).background(Color(0x66FFFFFF)).clickable { drawer = true },
+                .clip(RoundedCornerShape(8.dp)).background(Color(0x66FFFFFF)).clickable { drawerRight = false; drawer = true },
             contentAlignment = Alignment.Center
         ) { Text("▸", color = Color.White, fontSize = 14.sp) }
-        CategoryDrawer(drawer, { drawer = false }, catOptions, cat, pickCat, toggleFavCat)
+        CategoryDrawer(drawer, drawerRight, { drawer = false }, catOptions, cat, pickCat, toggleFavCat)
       }
     } else {
         Column(Modifier.fillMaxSize().screenBg()) {
@@ -455,7 +462,7 @@ fun LibraryScreen(kind: String, list: SavedList?, onNav: (String) -> Unit, onPla
 /** Slide-in list of categories for the phone (opened by a swipe from the right edge). */
 @Composable
 private fun CategoryDrawer(
-    open: Boolean, onClose: () -> Unit, options: List<CatOpt>, cat: String,
+    open: Boolean, fromRight: Boolean, onClose: () -> Unit, options: List<CatOpt>, cat: String,
     onPick: (String) -> Unit, onStar: (String) -> Unit
 ) {
     if (!open) return
@@ -463,9 +470,14 @@ private fun CategoryDrawer(
     Box(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color(0x99000000)).clickable { onClose() })
         Column(
-            Modifier.align(androidx.compose.ui.AbsoluteAlignment.CenterRight).fillMaxHeight().width(300.dp)
+            Modifier.align(if (fromRight) androidx.compose.ui.AbsoluteAlignment.CenterRight else androidx.compose.ui.AbsoluteAlignment.CenterLeft)
+                .fillMaxHeight().width(300.dp)
                 .background(Color(0xF2140F2E))
-                .pointerInput(Unit) { detectHorizontalDragGestures { change, dx -> if (dx > 12f) { change.consume(); onClose() } } }
+                .pointerInput(fromRight) {
+                    detectHorizontalDragGestures { change, dx ->
+                        if ((fromRight && dx > 12f) || (!fromRight && dx < -12f)) { change.consume(); onClose() }
+                    }
+                }
                 .padding(vertical = 10.dp, horizontal = 6.dp)
         ) {
             Text(
