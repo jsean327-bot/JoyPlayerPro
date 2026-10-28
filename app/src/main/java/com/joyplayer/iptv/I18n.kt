@@ -25,8 +25,8 @@ import java.util.Locale
  * which translates the English label into the chosen language. Strings without a translation stay English.
  */
 object Lang {
-    val codes = listOf("ar", "en", "fr", "es", "de", "it", "pt", "ru", "tr")
-    val names = listOf("العربية", "English", "Français", "Español", "Deutsch", "Italiano", "Português", "Русский", "Türkçe")
+    val codes = listOf("ar", "en", "fr", "es", "de", "it", "pt", "ru", "tr") + LangMore.codes
+    val names = listOf("العربية", "English", "Français", "Español", "Deutsch", "Italiano", "Português", "Русский", "Türkçe") + LangMore.names
 
     // column of each language inside the table rows (English is the key itself)
     private val col = mapOf("ar" to 0, "fr" to 1, "es" to 2, "de" to 3, "it" to 4, "pt" to 5, "ru" to 6, "tr" to 7)
@@ -61,7 +61,7 @@ object Lang {
         prefs?.edit()?.putString("code", c)?.apply()
     }
 
-    private class Table(val exact: HashMap<String, List<String>>, val prefix: List<Pair<String, List<String>>>)
+    class Table(val exact: HashMap<String, List<String>>, val prefix: List<Pair<String, List<String>>>)
 
     private val table: Table by lazy {
         val ex = HashMap<String, List<String>>()
@@ -80,7 +80,8 @@ object Lang {
     }
 
     fun tr(s: String): String {
-        val k = col[code] ?: return s
+        val extra = LangMore.col[code]
+        val k = col[code] ?: extra ?: return s
         if (s.isEmpty()) return s
         val i = s.indexOfFirst { it.isLetterOrDigit() }
         if (i < 0) return s
@@ -89,7 +90,7 @@ object Lang {
         val lead = s.substring(0, i)
         val core = s.substring(i, j)
         val tail = s.substring(j)
-        val t = table
+        val t = if (extra != null) LangMore.table else table
         t.exact[core]?.let { v -> return lead + (v.getOrNull(k) ?: core) + tail }
         for ((p, v) in t.prefix) {
             if (core.startsWith(p)) {
