@@ -545,7 +545,15 @@ private fun LivePane(
                     sel?.name ?: "", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
                 )
+                var guideOpen by remember { mutableStateOf(false) }
                 if (sel != null) {
+                    // the program guide / catch-up is always one tap away (no need to scroll to the small link)
+                    Button(
+                        onClick = { guideOpen = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = C.BurgundyDark),
+                        contentPadding = PaddingValues(horizontal = 12.dp)
+                    ) { Text(if (sel.archiveDays > 0) "📅⏪" else "📅", fontSize = 14.sp) }
+                    if (guideOpen) ProgramGuideDialog(sel, emptyList(), onFull) { guideOpen = false }
                     Button(
                         onClick = { onFav(sel) },
                         colors = ButtonDefaults.buttonColors(containerColor = C.Burgundy),
