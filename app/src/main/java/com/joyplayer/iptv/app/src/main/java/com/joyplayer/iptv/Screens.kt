@@ -526,7 +526,8 @@ private fun LivePane(
     player: ExoPlayer, sel: Channel?, favs: Set<String>,
     onFav: (Channel) -> Unit, onFull: (Channel) -> Unit, compact: Boolean, modifier: Modifier
 ) {
-    Column(modifier) {
+    // wide screen (phone turned sideways): the part with the picture and the program can be dragged up to reach everything under it
+    Column(if (compact) modifier else modifier.then(Modifier.verticalScroll(rememberScrollState()))) {
         Box(
             Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Color.Black),
             contentAlignment = Alignment.Center
@@ -570,7 +571,7 @@ private fun LivePane(
         } else {
             Text(sel?.name ?: "", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 2)
             EpgInfo(sel, onFull)
-            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.height(8.dp))
             if (sel != null) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
