@@ -150,6 +150,10 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             prepare(); playWhenReady = true
         }
     }
+    // a catch-up / other stream opens with its own player: the live channel of the small preview must stop meanwhile
+    LaunchedEffect(player) {
+        if (shared == null) SharedLive.player?.let { if (it !== player) it.pause() }
+    }
     LaunchedEffect(ch.url) {
         if (resumeAt > 0L) {
             android.widget.Toast.makeText(ctx, "Resuming from ${ResumeStore.fmt(resumeAt)}", android.widget.Toast.LENGTH_SHORT).show()
