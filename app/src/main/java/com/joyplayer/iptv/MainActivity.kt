@@ -46,6 +46,12 @@ class MainActivity : ComponentActivity() {
                 .crossfade(false)
                 .build()
         )
+        // leaving the app (Home, another app, screen off) stops all sound; it resumes when the app comes back
+        var paused: List<ExoPlayer> = emptyList()
+        lifecycle.addObserver(androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_STOP) paused = PlayerFactory.pauseAllPlaying(PipState.player)
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_START) { paused.forEach { runCatching { it.play() } }; paused = emptyList() }
+        })
         setContent {
             MaterialTheme(colorScheme = JoyColors) {
                 androidx.compose.runtime.CompositionLocalProvider(
