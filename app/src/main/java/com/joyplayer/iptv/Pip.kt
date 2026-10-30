@@ -34,10 +34,12 @@ fun Context.findActivity(): Activity? {
 
 object PipState {
     var canEnter = false
+    var player: ExoPlayer? = null   // the full-screen player (it handles its own stop / resume)
     var inPip by mutableStateOf(false)
 
     fun supported(a: Activity): Boolean =
         Build.VERSION.SDK_INT >= 26 &&
+                !isTvDevice(a) &&      // never on Fire TV / Android TV
                 a.packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
 
     fun isEnabled(c: Context): Boolean =
@@ -73,7 +75,8 @@ fun PipSupport(player: ExoPlayer) {
     val owner = LocalLifecycleOwner.current
     DisposableEffect(Unit) {
         PipState.canEnter = true
-        onDispose { PipState.canEnter = false; PipState.inPip = false }
+        PipState.player = player
+        onDispose { PipState.canEnter = false; PipState.inPip = false; if (PipState.player === player) PipState.player = null }
     }
     DisposableEffect(ctx) {
         val act = ctx.findActivity() as? ComponentActivity
