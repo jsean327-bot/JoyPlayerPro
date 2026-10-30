@@ -847,7 +847,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                     resizeMode = when (resizeMode) { 0 -> 4; 4 -> 3; else -> 0 }
                     playerPrefs.edit().putInt("resize", resizeMode).apply()
                 }
-                Opt("🖼  PiP", false) { dlgClose(); PipState.request(ctx) }
+                if (ctx.findActivity()?.let { PipState.supported(it) } == true) Opt("🖼  PiP", false) { dlgClose(); PipState.request(ctx) }
                 if (castCtx != null) Opt("📡  Cast", false) { dlgNav("cast") }
                 PlayQueue.nextAfter(ch.url)?.let { nx ->
                     if (hasMeta) Opt("⏭  Next", false) {
