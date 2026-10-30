@@ -34,6 +34,18 @@ object PlayerFactory {
 
     private val made = java.util.concurrent.CopyOnWriteArrayList<java.lang.ref.WeakReference<ExoPlayer>>()
 
+    /** Pauses every player that is playing (except [keep]) and returns them, so they can be resumed later. */
+    fun pauseAllPlaying(keep: ExoPlayer?): List<ExoPlayer> {
+        made.removeAll { it.get() == null }
+        val out = ArrayList<ExoPlayer>()
+        for (r in made) {
+            val p = r.get() ?: continue
+            if (p === keep) continue
+            runCatching { if (p.playWhenReady) { p.pause(); out.add(p) } }
+        }
+        return out
+    }
+
     /** True while any player of the app is playing (checked on the main thread). */
     private fun anyPlaying(): Boolean {
         made.removeAll { it.get() == null }
