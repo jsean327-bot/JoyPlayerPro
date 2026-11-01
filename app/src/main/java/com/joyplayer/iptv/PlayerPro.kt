@@ -138,7 +138,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     val meta = remember(ch.url) {
         PlayMeta.map[ch.url] ?: SubMeta(PlayMeta.cleanTitle(ch.name), PlayMeta.year(ch.name), null, null)
     }
-    val baseItem = remember(ch.url) { MediaItem.fromUri(AppPrefs.fmtUrl(ch.url)) }
+    val baseItem = remember(ch.url) { MediaItem.fromUri(AppPrefs.fmtUrl(Creds.fill(ch.url))) }
     val shared = remember(ch.url) { SharedLive.takeFor(ch.url) }
     val retries = remember(ch.url) { HashMap<String, StreamRetry>() }
     val vodTries = remember(ch.url) { intArrayOf(0) }   // reconnect attempts for a dropped movie / episode
