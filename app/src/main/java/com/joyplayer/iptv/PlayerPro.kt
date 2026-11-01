@@ -152,7 +152,8 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
     }
     // a catch-up / other stream opens with its own player: the live channel of the small preview must stop meanwhile
     LaunchedEffect(player) {
-        if (shared == null) SharedLive.player?.let { if (it !== player) it.pause() }
+        // pause() keeps the connection open: stop() really releases the server connection (the account may allow only one)
+        if (shared == null) SharedLive.player?.let { if (it !== player) { it.pause(); it.stop() } }
     }
     LaunchedEffect(ch.url) {
         if (resumeAt > 0L) {
@@ -455,12 +456,14 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
                 if (shared != null) return   // the live preview player reports its own errors
                 val cur = player.currentMediaItem?.localConfiguration?.uri?.toString() ?: return
                 // Movie / episode whose connection dropped: reconnect and carry on from the same minute
-                if (hasMeta && error.errorCode in 2000..2999 && vodTries[0] < 6) {
+                val http = PlayerFactory.httpStatus(error)
+                // a refused login (4xx) is not a lost connection: hammering the server only makes it worse, so one single retry for 401
+                if (hasMeta && error.errorCode in 2000..2999 && vodTries[0] < 6 && (http !in 400..499 || (http == 401 && vodTries[0] < 1))) {
                     val n = ++vodTries[0]
                     android.widget.Toast.makeText(ctx, "Connection lost, reconnecting ($n/6)...", android.widget.Toast.LENGTH_SHORT).show()
                     android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
                         runCatching { player.prepare(); player.playWhenReady = true }
-                    }, 1500L * n)
+                    }, if (http == 401) 5000L else 1500L * n)
                     return
                 }
                 PlayerFactory.handleError(ctx, player, error, cur, retries)
