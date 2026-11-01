@@ -63,6 +63,8 @@ object LiveRecover {
         }
 
         override fun onPlayerError(error: PlaybackException) {
+            // the server refused (401 / 403 / 404 ...): asking again and again changes nothing and can get the device blocked
+            if (PlayerFactory.httpStatus(error) in 400..499) return
             if (errN >= MAX) return
             h.removeCallbacks(errRun)
             h.postDelayed(errRun, RETRY[minOf(errN, RETRY.size - 1)])
