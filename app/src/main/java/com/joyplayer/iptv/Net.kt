@@ -49,7 +49,13 @@ object PlayerFactory {
     /** True while any player of the app is playing (checked on the main thread). */
     private fun anyPlaying(): Boolean {
         made.removeAll { it.get() == null }
-        return made.any { runCatching { it.get()?.isPlaying == true }.getOrDefault(false) }
+        return made.any {
+            runCatching {
+                val p = it.get()
+                p != null && (p.isPlaying || (p.playWhenReady &&
+                        (p.playbackState == androidx.media3.common.Player.STATE_BUFFERING || p.playbackState == androidx.media3.common.Player.STATE_READY)))
+            }.getOrDefault(false)
+        }
     }
 
     /** Waits (up to ~15 min) until nothing is playing, so background downloads never steal the bandwidth of a stream. */
@@ -133,6 +139,16 @@ object PlayerFactory {
         return host + (if (kind.isNotEmpty()) "/$kind" else "") + "/•••/•••/" + tail
     }
 
+    /** The HTTP status the server answered (401, 403, 404 ...), or 0 when the error is not an HTTP answer. */
+    fun httpStatus(e: PlaybackException): Int {
+        var t: Throwable? = e.cause
+        while (t != null) {
+            if (t is HttpDataSource.InvalidResponseCodeException) return t.responseCode
+            t = t.cause
+        }
+        return 0
+    }
+
     /** "HTTP 403 (IO_BAD_HTTP_STATUS)" when the server refused, otherwise just the error name. */
     fun describe(e: PlaybackException): String {
         val name = e.errorCodeName.removePrefix("ERROR_CODE_")
@@ -198,7 +214,7 @@ class StreamRetry(cur: String) {
         lastCause = PlayerFactory.rootCause(error)
         i++
         // A dead connection has nothing to do with the user agent: only try the other URL forms.
-        if (error.errorCode == 2001 || error.errorCode == 2002) {
+        if (error.errorCode == 2001 || error.errorCode == 2002 || PlayerFactory.httpStatus(error) == 401) {
             while (i < combos.size && combos[i].second != c.second) i++
         }
         val n = combos.getOrNull(i)
@@ -206,7 +222,8 @@ class StreamRetry(cur: String) {
             exhaustedAt = System.currentTimeMillis()
             PlayerFactory.uaIndex = combos[0].second
             PlayerFactory.lastDiag = "Could not play this stream (${log.size} tries):\n" +
-                    log.takeLast(9).joinToString("\n") + "\nCause: $lastCause"
+                    log.takeLast(9).joinToString("\n") + "\nCause: $lastCause" +
+                    (if (lastCause.contains("401")) "\nThe server refused the login: the account may be in use on another device, or this title is not in your package." else "")
             return false
         }
         PlayerFactory.uaIndex = n.second
