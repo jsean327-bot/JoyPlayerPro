@@ -210,7 +210,8 @@ class StreamRetry(cur: String) {
             return false
         }
         PlayerFactory.uaIndex = n.second
-        player.setMediaItem(MediaItem.fromUri(n.first))
+        val pos = if (player.duration != androidx.media3.common.C.TIME_UNSET) player.currentPosition else 0L
+        if (pos > 0L) player.setMediaItem(MediaItem.fromUri(n.first), pos) else player.setMediaItem(MediaItem.fromUri(n.first))
         player.prepare()
         player.playWhenReady = true
         return true
