@@ -13,9 +13,10 @@ import androidx.media3.exoplayer.ExoPlayer
 object LiveRecover {
     private val STALL = longArrayOf(10_000L, 10_000L, 15_000L, 20_000L)
     private val RETRY = longArrayOf(5_000L, 10_000L, 20_000L, 30_000L)
+    private val VOD_STALL = longArrayOf(12_000L, 12_000L, 20_000L, 30_000L)
     private const val MAX = 12
 
-    private class Guard(val p: ExoPlayer) : Player.Listener {
+    private class Guard(val p: ExoPlayer, val vod: Boolean = false) : Player.Listener {
         val h = Handler(Looper.getMainLooper())
         var stallN = 0
         var errN = 0
@@ -23,8 +24,10 @@ object LiveRecover {
         fun restart() {
             runCatching {
                 val item = p.currentMediaItem ?: return
+                // a movie / episode reconnects at the same minute, a live channel just restarts
+                val pos = if (vod && p.duration != androidx.media3.common.C.TIME_UNSET) p.currentPosition else 0L
                 p.stop()
-                p.setMediaItem(item)
+                if (vod && pos > 0L) p.setMediaItem(item, pos) else p.setMediaItem(item)
                 p.prepare()
                 p.playWhenReady = true
             }
@@ -33,7 +36,7 @@ object LiveRecover {
         val stallRun = Runnable {
             if (p.playbackState == Player.STATE_BUFFERING && p.playWhenReady && stallN < MAX) {
                 stallN++
-                AppLog.add("live", "stalled, reconnect #$stallN")
+                AppLog.add(if (vod) "vod" else "live", "stalled, reconnect #$stallN")
                 PlayerFactory.reconnecting = stallN
                 restart()
             }
@@ -50,7 +53,7 @@ object LiveRecover {
             when (state) {
                 Player.STATE_BUFFERING -> {
                     h.removeCallbacks(stallRun)
-                    h.postDelayed(stallRun, STALL[minOf(stallN, STALL.size - 1)])
+                    h.postDelayed(stallRun, if (vod) VOD_STALL[minOf(stallN, VOD_STALL.size - 1)] else STALL[minOf(stallN, STALL.size - 1)])
                 }
                 Player.STATE_READY -> {
                     cancel(); stallN = 0; errN = 0; PlayerFactory.reconnecting = 0
@@ -69,8 +72,8 @@ object LiveRecover {
     }
 
     /** Starts watching the player; call the returned function to stop. */
-    fun attach(player: ExoPlayer): () -> Unit {
-        val g = Guard(player)
+    fun attach(player: ExoPlayer, vod: Boolean = false): () -> Unit {
+        val g = Guard(player, vod)
         player.addListener(g)
         return {
             g.cancel()
