@@ -136,7 +136,9 @@ object PlayerFactory {
         val host = m.groupValues[1].substringAfter("://")
         val kind = m.groupValues[2].ifEmpty { "" }
         val tail = m.groupValues[5]
-        return host + (if (kind.isNotEmpty()) "/$kind" else "") + "/•••/•••/" + tail
+        // "{U}/{P}" left visible: it would mean the saved link never got the account's login filled in
+        val who = if (m.groupValues[3] == "{U}") "{U}/{P}" else "•••/•••"
+        return host + (if (kind.isNotEmpty()) "/$kind" else "") + "/$who/" + tail
     }
 
     /** The HTTP status the server answered (401, 403, 404 ...), or 0 when the error is not an HTTP answer. */
