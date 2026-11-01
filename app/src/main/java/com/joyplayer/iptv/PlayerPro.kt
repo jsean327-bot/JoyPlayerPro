@@ -467,7 +467,7 @@ fun ProPlayer(ch: Channel, onBack: () -> Unit) {
             }
         }
         player.addListener(l)
-        val detach = if (!hasMeta && shared == null) LiveRecover.attach(player) else null
+        val detach = if (shared == null) LiveRecover.attach(player, hasMeta) else null
         onDispose {
             detach?.invoke()
             player.removeListener(l)
