@@ -11,6 +11,15 @@ const Store = {
         Object.assign(this.state, s);
         this.state.settings = Object.assign({ liveFmt: 'auto' }, s.settings);
         this.state.settings.sort = Object.assign({ live: 0, movies: 1, series: 1 }, (s.settings || {}).sort);
+        // playlists saved earlier as an M3U link that is really an Xtream account become Xtream (so Movies and Series appear too)
+        let changed = false;
+        for (const l of this.state.lists) {
+          if (l.type === 'm3u') {
+            const x = parseXtreamLink(l.url);
+            if (x) { l.type = 'xtream'; l.server = x.server; l.user = x.user; l.pass = x.pass; delete l.url; changed = true; }
+          }
+        }
+        if (changed) this.save();
       }
     } catch (e) { }
   },
@@ -36,6 +45,19 @@ function baseOf(list) {
   let s = (list.server || '').trim();
   if (!/^https?:\/\//i.test(s)) s = 'http://' + s;
   return s.replace(/\/+$/, '').replace(/\/(player_api|get|panel_api|c)(\.php)?.*$/i, '');
+}
+/** A link like http://server:80/get.php?username=U&password=P&type=m3u_plus is really an Xtream account: returns {server,user,pass} (null for any other link). */
+function parseXtreamLink(text) {
+  let s = (text || '').trim();
+  if (!s) return null;
+  if (!/^https?:\/\//i.test(s)) s = 'http://' + s;
+  let u;
+  try { u = new URL(s); } catch (e) { return null; }
+  const user = u.searchParams.get('username'), pass = u.searchParams.get('password');
+  if (!user || !pass) return null;
+  if (!/\.php$/i.test(u.pathname)) return null;
+  const prefix = u.pathname.replace(/\/[^\/]*\.php$/i, '').replace(/\/+$/, '');
+  return { server: u.origin + prefix, user: user, pass: pass };
 }
 const cred = (l) => encodeURIComponent(l.user) + '/' + encodeURIComponent(l.pass);
 const Urls = {
