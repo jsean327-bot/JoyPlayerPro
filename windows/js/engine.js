@@ -29,10 +29,12 @@ class Engine {
     } else if (fmt === 'ts') plan.push(['ts', urls.ts], ['hls', urls.m3u8]);
     else if (fmt === 'hls') plan.push(['hls', urls.m3u8], ['ts', urls.ts]);
     else plan.push(['hls', urls.m3u8], ['ts', urls.ts]);
+    if (urls.raw) plan.push(['ts', urls.raw]);     // some servers only answer the short form  /user/pass/id
+    const diag = [];                                // what each try answered (shown if everything fails)
 
     const step = (k) => {
       if (my !== this.token) return;
-      if (k >= plan.length) { cb.error && cb.error('Could not play this channel (the server did not answer or the format is not supported).'); return; }
+      if (k >= plan.length) { cb.error && cb.error('Could not play this channel (the server did not answer or the format is not supported).' + (diag.length ? '  [' + diag.join(' | ') + ']' : '')); return; }
       const [type, url] = plan[k];
       this.stopEngines();
       let settled = false, recovered = false;
@@ -53,7 +55,7 @@ class Engine {
         this.stopEngines();
         step(k + 1);
       };
-      const timer = setTimeout(fail, 12000);
+      const timer = setTimeout(() => { diag.push(type.toUpperCase() + ': no answer in 12 s'); fail(); }, 12000);
       v.addEventListener('playing', onPlaying);
       cb.status && cb.status(type === 'hls' ? 'Connecting...' : 'Connecting (TS)...');
       try {
@@ -63,6 +65,7 @@ class Engine {
           this.hls = hls;
           hls.on(Hls.Events.ERROR, (_e, d) => {
             if (!d.fatal) return;
+            diag.push('HLS: ' + (d.response && d.response.code ? 'HTTP ' + d.response.code : d.details));
             if (d.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); return; }
             fail();
           });
@@ -74,7 +77,7 @@ class Engine {
           const p = mpegts.createPlayer({ type: 'mpegts', isLive: true, url }, { enableWorker: true, liveBufferLatencyChasing: true, lazyLoadMaxDuration: 30 });
           this.ts = p;
           p.attachMediaElement(v);
-          p.on(mpegts.Events.ERROR, () => fail());
+          p.on(mpegts.Events.ERROR, (t, detail, info) => { diag.push('TS: ' + (info && info.code ? 'HTTP ' + info.code : detail || t)); fail(); });
           p.load();
           const pr = p.play();
           if (pr && pr.catch) pr.catch(() => { });
