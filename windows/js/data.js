@@ -65,7 +65,7 @@ const Urls = {
   live(l, it) {
     if (l.type === 'm3u') return { direct: it.u };
     const b = baseOf(l);
-    return { m3u8: `${b}/live/${cred(l)}/${it.i}.m3u8`, ts: `${b}/live/${cred(l)}/${it.i}.ts` };
+    return { m3u8: `${b}/live/${cred(l)}/${it.i}.m3u8`, ts: `${b}/live/${cred(l)}/${it.i}.ts`, raw: `${b}/${cred(l)}/${it.i}` };
   },
   movie(l, it, ext) { return `${baseOf(l)}/movie/${cred(l)}/${it.i}.${ext || it.e || 'mp4'}`; },
   episode(l, id, ext) { return `${baseOf(l)}/series/${cred(l)}/${id}.${ext || 'mp4'}`; }
