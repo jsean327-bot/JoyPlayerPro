@@ -231,6 +231,9 @@ function createPlaylists() {
       h('div', { class: 'acts' }, h('button', { class: 'btn ghost', text: 'Cancel', onclick: () => m.close() }),
         h('button', { class: 'btn', text: 'Save', onclick: async () => {
           const o = { id: existing ? existing.id : 'p' + Date.now().toString(36), name: f.name.value.trim() || 'My IPTV', type: f.type.value };
+          // a get.php?username=..&password=.. link (pasted in either box) is an Xtream account
+          const lk = parseXtreamLink(o.type === 'm3u' ? f.url.value : f.server.value);
+          if (lk) { o.type = 'xtream'; f.server.value = lk.server; f.user.value = lk.user; f.pass.value = lk.pass; }
           if (o.type === 'xtream') {
             o.server = f.server.value.trim(); o.user = f.user.value.trim(); o.pass = f.pass.value.trim();
             if (!o.server || !o.user) return toast('Enter the server address and the username');
