@@ -24,6 +24,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "cast.js",
       "index.html",
       "css/**/*",
       "js/**/*",
