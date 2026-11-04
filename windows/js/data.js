@@ -29,8 +29,16 @@ const Store = {
     const id = list ? list.id : '_';
     const u = this.state.user[id] || (this.state.user[id] = {});
     u.fav = u.fav || {}; u.favCats = u.favCats || {}; u.recent = u.recent || [];
+    u.recentVod = u.recentVod || { movies: [], series: [] };
     for (const k of ['live', 'movies', 'series']) { u.fav[k] = u.fav[k] || []; u.favCats[k] = u.favCats[k] || []; }
     return u;
+  },
+  /** Remembers the movies / series opened (newest first) for the "Recently watched" category. */
+  pushRecentVod(list, kind, id) {
+    const u = this.user(list);
+    const a = u.recentVod[kind] = u.recentVod[kind] || [];
+    u.recentVod[kind] = [id, ...a.filter(x => x !== id)].slice(0, 80);
+    this.save();
   },
   saveResume(url, pos, dur) {
     const r = this.state.resume;
