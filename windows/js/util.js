@@ -1,16 +1,18 @@
 'use strict';
 function h(tag, attrs, ...kids) {
   const el = document.createElement(tag);
+  const data = !!(attrs && attrs.dir === 'auto');      // channel / movie names etc. are never translated
   if (attrs) for (const k in attrs) {
-    const v = attrs[k];
+    let v = attrs[k];
     if (v == null || v === false) continue;
+    if (!data && (k === 'placeholder' || k === 'title') && typeof v === 'string') v = Lang.tr(v);
     if (k === 'class') el.className = v;
-    else if (k === 'text') el.textContent = v;
+    else if (k === 'text') el.textContent = data || typeof v !== 'string' ? v : Lang.tr(v);
     else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
     else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
     else el.setAttribute(k, v === true ? '' : v);
   }
-  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(String(c)));
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c.nodeType ? c : document.createTextNode(data || typeof c !== 'string' ? String(c) : Lang.tr(c)));
   return el;
 }
 const $ = (s, r) => (r || document).querySelector(s);
@@ -64,7 +66,7 @@ const Fit = {
   },
   cycle() {
     const s = Store.state.settings; s.fit = ((s.fit || 0) + 1) % 3; Store.save(); this.apply();
-    toast('Picture: ' + this.names[s.fit], 1200);
+    toast(trf('Picture: {0}', tr(this.names[s.fit])), 1200);
   }
 };
 
@@ -82,7 +84,7 @@ const Sleep = {
       document.querySelectorAll('video').forEach(v => v.pause());
       this.idx = 0; toast('Sleep timer: stopped', 5000);
     }, min * 60000);
-    toast('Sleep timer: ' + min + ' min', 1600);
+    toast(trf('Sleep timer: {0} min', min), 1600);
   }
 };
 
@@ -96,7 +98,7 @@ const Subs = {
   },
   size(d) {
     const s = Store.state.settings; s.subSize = Math.min(60, Math.max(14, (s.subSize || 28) + d)); Store.save(); this.applyCss();
-    toast('Subtitle size ' + s.subSize, 900);
+    toast(trf('Subtitle size {0}', s.subSize), 900);
   },
   async load(video) {
     const r = await native.openSub();
@@ -109,7 +111,7 @@ const Subs = {
     tr.src = URL.createObjectURL(new Blob([txt], { type: 'text/vtt' }));
     video.append(tr);
     tr.track.mode = 'showing';
-    toast('Subtitles: ' + r.name, 1800);
+    toast(trf('Subtitles: {0}', r.name), 1800);
   },
   off(video, quiet) {
     video.querySelectorAll('track').forEach(t => { try { t.track.mode = 'disabled'; } catch (e) { } t.remove(); });
@@ -120,7 +122,7 @@ const Subs = {
 let toastTimer = 0;
 function toast(msg, ms) {
   const t = $('#toast');
-  t.textContent = msg; t.classList.add('on');
+  t.textContent = Lang.tr(msg); t.classList.add('on');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => t.classList.remove('on'), ms || 2200);
 }
