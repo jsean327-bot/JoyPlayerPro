@@ -27,15 +27,16 @@ const VodPlayer = (() => {
         h('button', { class: 'btn ghost', text: 'A−', onclick: () => Subs.size(-2) }),
         h('button', { class: 'btn ghost', text: 'A+', onclick: () => Subs.size(2) }))));
   }
-  function open(c) {                       // c = {title, url, key, next(), onEnd}
+  function open(c) {                       // c = {title, url, key, next(), prev(), onEnd}
     close(true);
     ctx = c;
-    const video = h('video', { controls: true, autoplay: true });
+    const video = h('video', { autoplay: true });
     const msg = h('div', { class: 'msg', text: 'Loading...' });
     video.volume = Number(localStorage.getItem('vol') || 1);
     speedSel = h('select', { title: 'Speed ( [ and ] )' }, SPEEDS.map(x => h('option', { value: x, text: x + 'x' })));
     speedSel.value = '1';
     speedSel.addEventListener('change', () => { video.playbackRate = Number(speedSel.value); });
+    const mediaOf = () => ({ url: c.url, title: c.title, live: !!c.stream, at: c.stream ? 0 : (video.currentTime || 0) });
     const bar = h('div', { class: 'bar' },
       h('button', { class: 'btn ghost', text: '← Back', onclick: () => close() }),
       h('div', { class: 't', dir: 'auto', text: c.title }),
@@ -44,9 +45,47 @@ const VodPlayer = (() => {
       h('button', { class: 'btn ghost', text: '💬 Subtitles', onclick: () => subMenu(video) }),
       h('button', { class: 'btn ghost', text: '⤢', title: 'Picture: Fit / Zoom / Stretch (Z)', onclick: () => Fit.cycle() }),
       h('button', { class: 'btn ghost', text: '😴', title: 'Sleep timer (S)', onclick: () => Sleep.cycle() }),
-      c.next ? h('button', { class: 'btn ghost', text: 'Next ⏭', onclick: () => playNext() }) : null);
-    el = h('div', { id: 'vod' }, bar, video, msg);
+      h('button', { class: 'btn ghost', text: '📡', title: 'Cast to TV', onclick: () => CastUI.pick(mediaOf, { onStart: () => video.pause(), onStop: () => { if (el) video.play().catch(() => { }); } }) }),
+      h('button', { class: 'btn ghost', text: '🖥', title: 'Open in VLC / another player', onclick: () => { video.pause(); CastUI.external(mediaOf); } }));
+    // bottom controls: play/pause, previous / next, seek bar, volume
+    const playBtn = h('button', { class: 'cb big', text: '⏸', title: 'Play / Pause (Space)', onclick: () => togglePlay(video) });
+    const seek = h('input', { type: 'range', class: 'seek', min: 0, max: 1000, step: 1, value: 0 });
+    const tm = h('span', { class: 'tm', text: '0:00 / 0:00' });
+    const vol = h('input', { type: 'range', class: 'vol', min: 0, max: 100, value: Math.round(video.volume * 100), title: 'Volume' });
+    const muteBtn = h('button', { class: 'cb', text: '🔊', title: 'Mute (M)', onclick: () => { video.muted = !video.muted; } });
+    let dragging = false;
+    const fin = (n) => isFinite(n) && n > 0;
+    const paint = () => {
+      const d = video.duration, t = video.currentTime || 0;
+      seek.classList.toggle('hidden', !fin(d));
+      if (fin(d)) {
+        if (!dragging) seek.value = String(Math.round(t / d * 1000));
+        let bufEnd = 0; try { for (let i = 0; i < video.buffered.length; i++) if (video.buffered.start(i) <= t + 1) bufEnd = Math.max(bufEnd, video.buffered.end(i)); } catch (e) { }
+        seek.style.setProperty('--p', (t / d * 100) + '%'); seek.style.setProperty('--b', (bufEnd / d * 100) + '%');
+      }
+      tm.textContent = fin(d) ? fmtTime(t) + ' / ' + fmtTime(d) : fmtTime(t);
+    };
+    seek.addEventListener('input', () => { dragging = true; if (fin(video.duration)) tm.textContent = fmtTime(Number(seek.value) / 1000 * video.duration) + ' / ' + fmtTime(video.duration); seek.style.setProperty('--p', (Number(seek.value) / 10) + '%'); });
+    seek.addEventListener('change', () => { if (fin(video.duration)) video.currentTime = Number(seek.value) / 1000 * video.duration; dragging = false; });
+    vol.addEventListener('input', () => { video.muted = false; video.volume = Number(vol.value) / 100; localStorage.setItem('vol', String(video.volume)); });
+    video.addEventListener('volumechange', () => { vol.value = String(Math.round((video.muted ? 0 : video.volume) * 100)); muteBtn.textContent = video.muted || video.volume === 0 ? '🔇' : (video.volume < 0.5 ? '🔉' : '🔊'); });
+    video.addEventListener('play', () => { playBtn.textContent = '⏸'; });
+    video.addEventListener('pause', () => { playBtn.textContent = '▶'; wake(); });
+    for (const ev of ['timeupdate', 'durationchange', 'progress', 'loadedmetadata']) video.addEventListener(ev, paint);
+    const skip = (d) => h('button', { class: 'cb', text: d < 0 ? '⟲ ' + (-d) : d + ' ⟳', title: (d < 0 ? 'Back ' : 'Forward ') + Math.abs(d) + 's (← / →)', onclick: () => { video.currentTime = Math.max(0, video.currentTime + d); } });
+    const ctl = h('div', { class: 'ctl' },
+      seek,
+      h('div', { class: 'crow' },
+        c.prev ? h('button', { class: 'cb', text: '⏮', title: 'Previous (P)', onclick: () => playPrev() }) : null,
+        skip(-10), playBtn, skip(10),
+        c.next ? h('button', { class: 'cb', text: '⏭', title: 'Next (N)', onclick: () => playNext() }) : null,
+        tm, h('div', { class: 'sp' }), muteBtn, vol,
+        h('button', { class: 'cb', text: '⛶', title: 'Full screen (F)', onclick: () => native.isFullscreen().then(f => native.fullscreen(!f)) })));
+    el = h('div', { id: 'vod' }, bar, video, msg, ctl);
     document.body.append(el);
+    video.addEventListener('click', () => togglePlay(video));
+    video.addEventListener('dblclick', () => native.isFullscreen().then(f => native.fullscreen(!f)));
+    el.addEventListener('wheel', (e) => { video.muted = false; video.volume = Math.min(1, Math.max(0, video.volume + (e.deltaY < 0 ? 0.05 : -0.05))); localStorage.setItem('vol', String(video.volume)); }, { passive: true });
     native.fullscreen(true);
     engine = new Engine(video);
     const resume = (Store.state.resume[c.url] || [0])[0];
@@ -64,7 +103,9 @@ const VodPlayer = (() => {
     saveT = setInterval(() => { if (!c.stream && video.duration && video.currentTime > 5) Store.saveResume(c.url, video.currentTime, video.duration); }, 8000);
     el.addEventListener('mousemove', wake); wake();
   }
-  function wake() { if (!el) return; el.classList.remove('idle'); clearTimeout(hideT); hideT = setTimeout(() => el && el.classList.add('idle'), 3200); }
+  function togglePlay(v) { v.paused ? v.play().catch(() => { }) : v.pause(); }
+  function playPrev() { const c = ctx; const n = c && c.prev && c.prev(); if (n) open(n); }
+  function wake() { if (!el) return; el.classList.remove('idle'); clearTimeout(hideT); hideT = setTimeout(() => { const v = el && el.querySelector('video'); if (el && v && !v.paused) el.classList.add('idle'); }, 3200); }
   function playNext() { const c = ctx; const n = c.next && c.next(); if (n) open(n); else close(); }
   function close(silent) {
     clearInterval(saveT);
@@ -92,14 +133,15 @@ const VodPlayer = (() => {
       case '[': setSpeed(v, -1); return true;
       case 'z': case 'Z': Fit.cycle(); return true;
       case 's': case 'S': Sleep.cycle(); return true;
-      case ' ': v.paused ? v.play() : v.pause(); return true;
+      case ' ': togglePlay(v); return true;
       case 'm': case 'M': v.muted = !v.muted; return true;
       case 'f': case 'F': native.isFullscreen().then(f => native.fullscreen(!f)); return true;
       case 'n': case 'N': if (ctx && ctx.next) playNext(); return true;
+      case 'p': case 'P': if (ctx && ctx.prev) playPrev(); return true;
     }
     return false;
   }
-  return { open, close, onKey, isOpen: () => !!el };
+  return { open, close, onKey, audioMenu, isOpen: () => !!el };
 })();
 
 const Detail = {
@@ -153,7 +195,7 @@ const Detail = {
         const f = flat[idx]; if (!f) return null;
         return {
           title: it.n + ' — S' + f.s + ' E' + f.e.episode_num + (f.e.title ? ' · ' + f.e.title : ''), url: f.url,
-          next: () => playAt(idx + 1)
+          next: () => playAt(idx + 1), prev: idx > 0 ? () => playAt(idx - 1) : undefined
         };
       };
       if (!keys.length) { acts.append(h('div', { class: 'meta', text: 'No episodes available' })); }
