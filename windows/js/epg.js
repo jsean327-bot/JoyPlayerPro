@@ -67,11 +67,11 @@ const Epg = {
     const body = h('div', { class: 'glist' }, spinner('Loading the guide...'));
     const m = modal(h('div', { class: 'card guide' },
       h('div', { class: 'ghead' }, h('h3', { dir: 'auto', text: '📅 ' + it.n }), h('button', { class: 'btn ghost small', text: '✕', onclick: () => m.close() })),
-      it.d > 0 ? h('div', { class: 'gnote', text: '⏪ Past programs can be played (last ' + it.d + ' days)' }) : null,
+      it.d > 0 ? h('div', { class: 'gnote', text: '⏪ ' + trf('Past programs can be played (last {0} days)', it.d) }) : null,
       body));
     const items = await this.full(list, it);
     if (!document.body.contains(m.el)) return;
-    if (!items.length) { body.replaceChildren(h('div', { class: 'empty', text: 'No program information for this channel.' })); return; }
+    if (!items.length) { body.replaceChildren(h('div', { class: 'empty', text: 'No program information for this channel' })); return; }
     const now = Date.now() / 1000;
     const rows = [];
     let lastDay = '', nowRow = null;
