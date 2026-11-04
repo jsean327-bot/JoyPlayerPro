@@ -266,7 +266,8 @@ function createPlaylists() {
     };
     f.type.value = l.type || 'xtream';
     const xt = h('div', {}, field('Server address', f.server), field('Username', f.user), field('Password', f.pass));
-    const mu = h('div', {}, field('M3U link', f.url));
+    f.epg = h('input', { value: l.epgUrl || '', placeholder: 'http://.../epg.xml or epg.xml.gz (optional)' });
+    const mu = h('div', {}, field('M3U link', f.url), field('Program guide link (XMLTV, optional)', f.epg));
     const sw = () => { xt.classList.toggle('hidden', f.type.value !== 'xtream'); mu.classList.toggle('hidden', f.type.value !== 'm3u'); };
     f.type.addEventListener('change', sw); sw();
     const m = modal(h('div', { class: 'card form' }, h('h3', { text: existing ? 'Edit playlist' : 'Add playlist' }),
@@ -282,6 +283,7 @@ function createPlaylists() {
             if (!o.server || !o.user) return toast('Enter the server address and the username');
           } else {
             o.url = f.url.value.trim();
+            o.epgUrl = f.epg.value.trim();
             if (!/^https?:\/\//i.test(o.url)) return toast('Enter a valid http(s) link');
           }
           if (existing) { Object.assign(existing, o); await Content.reload(existing); }
