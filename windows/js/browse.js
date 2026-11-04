@@ -192,7 +192,7 @@ function createBrowse(kind) {
   }
   function openGuide() {
     const it = S.sel; if (!it) { toast('Select a channel first'); return; }
-    if (S.list.type !== 'xtream') { toast('The program guide needs an Xtream playlist'); return; }
+    if (!Epg.hasGuide(S.list)) { toast('This playlist has no program guide link (add one when editing the playlist)'); return; }
     Epg.guide(S.list, it, {
       catchup: (p) => {
         const url = Epg.catchupUrl(S.list, it, p);
