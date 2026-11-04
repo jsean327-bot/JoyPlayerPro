@@ -32,6 +32,7 @@ const App = {
   const app = $('#app');
   await Store.load();
   await AppLog.load();
+  Fit.apply(); Subs.applyCss();
   const nav = h('div', { id: 'nav' }, h('span', { class: 'logo' }, 'Joy', h('b', { text: 'Player' }), ' IPTV Pro'));
   const items = [['home', 'Home'], ['live', 'Live'], ['movies', 'Movies'], ['series', 'Series'], ['playlists', 'Playlists'], ['settings', 'Settings']];
   for (const [k, t] of items) nav.append(h('button', { class: 'navbtn', 'data-v': k, text: t, onclick: () => App.show(k) }));
