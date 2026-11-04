@@ -31,6 +31,7 @@ const App = {
 (async function boot() {
   const app = $('#app');
   await Store.load();
+  Lang.init(Store.state.settings.lang || Lang.detect());
   await AppLog.load();
   Fit.apply(); Subs.applyCss();
   const nav = h('div', { id: 'nav' }, h('span', { class: 'logo' }, 'Joy', h('b', { text: 'Player' }), ' IPTV Pro'));
