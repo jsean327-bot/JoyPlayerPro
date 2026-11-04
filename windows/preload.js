@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('native', {
   version: () => ipcRenderer.invoke('app:version'),
   openExternal: (u) => ipcRenderer.invoke('app:openExternal', u),
   quit: () => ipcRenderer.invoke('app:quit'),
+  openSub: () => ipcRenderer.invoke('sub:open'),
   awake: (on) => ipcRenderer.invoke('power:awake', !!on),
   dohGet: () => ipcRenderer.invoke('doh:get'),
   dohSet: (m) => ipcRenderer.invoke('doh:set', m),
