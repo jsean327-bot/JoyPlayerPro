@@ -31,6 +31,7 @@ const App = {
 (async function boot() {
   const app = $('#app');
   await Store.load();
+  await AppLog.load();
   const nav = h('div', { id: 'nav' }, h('span', { class: 'logo' }, 'Joy', h('b', { text: 'Player' }), ' IPTV Pro'));
   const items = [['home', 'Home'], ['live', 'Live'], ['movies', 'Movies'], ['series', 'Series'], ['playlists', 'Playlists'], ['settings', 'Settings']];
   for (const [k, t] of items) nav.append(h('button', { class: 'navbtn', 'data-v': k, text: t, onclick: () => App.show(k) }));
@@ -59,5 +60,6 @@ const App = {
   if (!l) App.show('playlists');
   else { App.show('home'); Preload.run(); }
   $('#navinfo').textContent = l ? l.name : '';
+  setTimeout(() => Updater.check(true), 5000);
   setInterval(() => { const a = Store.list(); $('#navinfo').textContent = a ? a.name : ''; }, 2000);
 })();
