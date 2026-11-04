@@ -110,6 +110,7 @@ function createBrowse(kind) {
       h('span', { class: 'num', text: i + 1 }),
       it.l ? h('img', { src: it.l, loading: 'lazy', onerror: (e) => { e.target.style.visibility = 'hidden'; } }) : h('span', { style: { width: '40px' } }),
       h('span', { class: 'nm', dir: 'auto', text: it.n }),
+      it.d > 0 ? h('span', { class: 'arch', text: '⏪', title: 'Catch-up: ' + it.d + ' days' }) : null,
       h('span', { class: 'fv' + (S.favSet.has(it.i) ? ' on' : ''), text: '★', title: 'Favorite', onclick: (e) => { e.stopPropagation(); toggleFav(it); } }));
   }
   function posterRow(r) {
@@ -141,7 +142,7 @@ function createBrowse(kind) {
   });
 
   // ----- live preview
-  let video, stage, msgEl, topEl, ptitle, pfav, idleTimer = 0, selTimer = 0;
+  let video, stage, msgEl, topEl, ptitle, pfav, epgBox, idleTimer = 0, selTimer = 0, epgTimer = 0;
   if (isLive) {
     video = engine.v; video.volume = Number(localStorage.getItem('vol') || 1);
     msgEl = h('div', { class: 'msg', text: 'Select a channel' });
@@ -149,8 +150,12 @@ function createBrowse(kind) {
     stage = h('div', { class: 'stage' }, video, msgEl, topEl);
     ptitle = h('div', { class: 't', dir: 'auto', text: '' });
     pfav = h('button', { class: 'btn ghost', text: '★ Favorite', onclick: () => { if (S.sel) toggleFav(S.sel); } });
+    epgBox = h('div', { class: 'epgbox' });
     const pane = h('div', { class: 'live-pane' }, stage,
-      h('div', { class: 'pinfo' }, ptitle, pfav, h('button', { class: 'btn', text: '⛶ Full screen', onclick: () => enterTheater() })));
+      h('div', { class: 'pinfo' }, ptitle, pfav,
+        h('button', { class: 'btn ghost', text: '📅 Guide', title: 'Program guide and catch-up', onclick: () => openGuide() }),
+        h('button', { class: 'btn', text: '⛶ Full screen', onclick: () => enterTheater() })),
+      epgBox);
     cols.append(pane);
     stage.addEventListener('dblclick', () => { if (S.theater) exitTheater(); else enterTheater(); });
     stage.addEventListener('mousemove', wake);
@@ -173,10 +178,28 @@ function createBrowse(kind) {
     msgEl.textContent = 'Connecting...'; msgEl.classList.remove('hidden');
     const u = Store.user(S.list);
     u.recent = [it.i, ...u.recent.filter(x => x !== it.i)].slice(0, 60); Store.save();
+    paintEpg();
     engine.live(Urls.live(S.list, it), {
       playing: () => msgEl.classList.add('hidden'),
       status: (m) => { msgEl.textContent = m; msgEl.classList.remove('hidden'); },
       error: (m) => { msgEl.textContent = m; msgEl.classList.remove('hidden'); AppLog.add('live', it.n + ' | ' + m); }
+    });
+  }
+  async function paintEpg() {
+    const it = S.sel; if (!it || !epgBox) return;
+    const t = await Epg.paint(epgBox, S.list, it, () => S.sel === it);
+    if (t && S.sel === it) topEl.textContent = it.n + '  —  ' + t;
+  }
+  function openGuide() {
+    const it = S.sel; if (!it) { toast('Select a channel first'); return; }
+    if (S.list.type !== 'xtream') { toast('The program guide needs an Xtream playlist'); return; }
+    Epg.guide(S.list, it, {
+      catchup: (p) => {
+        const url = Epg.catchupUrl(S.list, it, p);
+        clearTimeout(selTimer); engine.stop();                // the live channel must release its connection first
+        msgEl.textContent = 'Catch-up playing'; msgEl.classList.remove('hidden');
+        VodPlayer.open({ title: it.n + ' — ' + p.title + ' (' + Epg.hm(p.start) + ')', url, stream: true, onClose: () => { if (S.sel) playSel(); } });
+      }
     });
   }
   function select(it, scroll) {
@@ -293,12 +316,13 @@ function createBrowse(kind) {
     el: root, kind,
     async show() {
       root.classList.remove('hidden');
+      if (isLive) { clearInterval(epgTimer); epgTimer = setInterval(() => { if (!S.theater) paintEpg(); }, 60000); }
       await load();
       if (isLive && S.sel && S.data) playSel();
     },
     hide() {
       root.classList.add('hidden');
-      if (isLive) { clearTimeout(selTimer); if (S.theater) exitTheater(); engine.stop(); }
+      if (isLive) { clearInterval(epgTimer); clearTimeout(selTimer); if (S.theater) exitTheater(); engine.stop(); }
     },
     invalidate() { S.loadedFor = null; S.data = null; built = false; },
     onKey,
