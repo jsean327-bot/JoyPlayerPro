@@ -12,5 +12,12 @@ contextBridge.exposeInMainWorld('native', {
   onFullscreen: (cb) => ipcRenderer.on('fs', (_e, v) => cb(v)),
   version: () => ipcRenderer.invoke('app:version'),
   openExternal: (u) => ipcRenderer.invoke('app:openExternal', u),
-  quit: () => ipcRenderer.invoke('app:quit')
+  quit: () => ipcRenderer.invoke('app:quit'),
+  awake: (on) => ipcRenderer.invoke('power:awake', !!on),
+  dohGet: () => ipcRenderer.invoke('doh:get'),
+  dohSet: (m) => ipcRenderer.invoke('doh:set', m),
+  backupExport: (t) => ipcRenderer.invoke('backup:export', t),
+  backupImport: () => ipcRenderer.invoke('backup:import'),
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateInstall: (u, n, p) => ipcRenderer.invoke('update:install', u, n, p)
 });
