@@ -209,3 +209,5 @@ input.vol{width:90px;--p:100%;--b:100%}
 #castbar .seek{width:200px}
 #castbar .btn{white-space:nowrap}
 #castbar .tm{white-space:nowrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.modal input:not([type=checkbox]):not([type=range]){background:#0b1230;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--text);outline:none}
+.modal input:focus{border-color:var(--blue)}
