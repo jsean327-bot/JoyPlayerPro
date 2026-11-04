@@ -60,7 +60,7 @@ const App = {
 
   const l = Store.list();
   if (!l) App.show('playlists');
-  else { App.show('home'); Preload.run(); }
+  else { App.show('home', true); Preload.run(); }
   $('#navinfo').textContent = l ? l.name : '';
   setTimeout(() => Updater.check(true), 5000);
   setInterval(() => { const a = Store.list(); $('#navinfo').textContent = a ? a.name : ''; }, 2000);
