@@ -54,6 +54,69 @@ const KeepAwake = {
   }
 };
 
+/** Picture mode for every video: Fit / Zoom / Stretch. */
+const Fit = {
+  names: ['Fit', 'Zoom (fills the screen)', 'Stretch'], css: ['contain', 'cover', 'fill'],
+  apply() {
+    let st = document.getElementById('fitcss');
+    if (!st) { st = document.createElement('style'); st.id = 'fitcss'; document.head.append(st); }
+    st.textContent = 'video{object-fit:' + this.css[(Store.state.settings.fit || 0) % 3] + ' !important}';
+  },
+  cycle() {
+    const s = Store.state.settings; s.fit = ((s.fit || 0) + 1) % 3; Store.save(); this.apply();
+    toast('Picture: ' + this.names[s.fit], 1200);
+  }
+};
+
+/** Sleep timer: pauses everything after the chosen minutes. */
+const Sleep = {
+  steps: [0, 15, 30, 45, 60, 90, 120], idx: 0, t: 0,
+  cycle() {
+    this.idx = (this.idx + 1) % this.steps.length;
+    this.set(this.steps[this.idx]);
+  },
+  set(min) {
+    clearTimeout(this.t);
+    if (!min) { this.idx = 0; toast('Sleep timer: off', 1400); return; }
+    this.t = setTimeout(() => {
+      document.querySelectorAll('video').forEach(v => v.pause());
+      this.idx = 0; toast('Sleep timer: stopped', 5000);
+    }, min * 60000);
+    toast('Sleep timer: ' + min + ' min', 1600);
+  }
+};
+
+/** Subtitles from a file (.srt / .vtt) with a size setting. */
+const Subs = {
+  applyCss() {
+    let st = document.getElementById('cuecss');
+    if (!st) { st = document.createElement('style'); st.id = 'cuecss'; document.head.append(st); }
+    const px = Store.state.settings.subSize || 28;
+    st.textContent = 'video::cue{font-size:' + px + 'px;color:#fff;background:rgba(0,0,0,.6);font-family:"Segoe UI",Tahoma,sans-serif}';
+  },
+  size(d) {
+    const s = Store.state.settings; s.subSize = Math.min(60, Math.max(14, (s.subSize || 28) + d)); Store.save(); this.applyCss();
+    toast('Subtitle size ' + s.subSize, 900);
+  },
+  async load(video) {
+    const r = await native.openSub();
+    if (!r) return;
+    let txt = r.text.replace(/^\uFEFF/, '');
+    if (!/^WEBVTT/.test(txt)) txt = 'WEBVTT\n\n' + txt.replace(/\r/g, '').replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, '$1.$2');
+    this.off(video, true);
+    const tr = document.createElement('track');
+    tr.kind = 'subtitles'; tr.label = r.name; tr.default = true;
+    tr.src = URL.createObjectURL(new Blob([txt], { type: 'text/vtt' }));
+    video.append(tr);
+    tr.track.mode = 'showing';
+    toast('Subtitles: ' + r.name, 1800);
+  },
+  off(video, quiet) {
+    video.querySelectorAll('track').forEach(t => { try { t.track.mode = 'disabled'; } catch (e) { } t.remove(); });
+    if (!quiet) toast('Subtitles off', 1200);
+  }
+};
+
 let toastTimer = 0;
 function toast(msg, ms) {
   const t = $('#toast');
