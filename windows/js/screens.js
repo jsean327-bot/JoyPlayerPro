@@ -1,15 +1,49 @@
 'use strict';
 /* ---------------- movie / series detail + VOD player ---------------- */
 const VodPlayer = (() => {
-  let el = null, engine = null, hideT = 0, ctx = null, saveT = 0;
+  let el = null, engine = null, hideT = 0, ctx = null, saveT = 0, speedSel = null;
+  const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 1.75, 2];
+  function setSpeed(v, d) {
+    const i = Math.min(SPEEDS.length - 1, Math.max(0, SPEEDS.indexOf(v.playbackRate) + d));
+    v.playbackRate = SPEEDS[i]; if (speedSel) speedSel.value = String(SPEEDS[i]);
+    toast('Speed ' + SPEEDS[i] + 'x', 900);
+  }
+  function audioMenu(video) {
+    const at = video.audioTracks;
+    if (!at || at.length < 2) { toast('This video has only one audio track', 1800); return; }
+    const m = modal(h('div', { class: 'card form' }, h('h3', { text: 'Audio' }),
+      ...[...Array(at.length).keys()].map(i => h('button', {
+        class: 'btn' + (at[i].enabled ? '' : ' ghost'), style: { display: 'block', width: '100%', margin: '6px 0', textAlign: 'left' },
+        text: (at[i].enabled ? '✓ ' : '') + (at[i].label || at[i].language || ('Track ' + (i + 1))),
+        onclick: () => { for (let k = 0; k < at.length; k++) at[k].enabled = (k === i); m.close(); }
+      }))));
+  }
+  function subMenu(video) {
+    const m = modal(h('div', { class: 'card form' }, h('h3', { text: 'Subtitles' }),
+      h('div', { class: 'd', style: { color: 'var(--muted)', fontSize: '13px', marginBottom: '8px' }, text: 'Choose an .srt or .vtt file (Arabic files work too).' }),
+      h('div', { class: 'acts', style: { justifyContent: 'flex-start', flexWrap: 'wrap' } },
+        h('button', { class: 'btn', text: '📂 Load file...', onclick: async () => { m.close(); await Subs.load(video); } }),
+        h('button', { class: 'btn ghost', text: 'Off', onclick: () => { Subs.off(video); m.close(); } }),
+        h('button', { class: 'btn ghost', text: 'A−', onclick: () => Subs.size(-2) }),
+        h('button', { class: 'btn ghost', text: 'A+', onclick: () => Subs.size(2) }))));
+  }
   function open(c) {                       // c = {title, url, key, next(), onEnd}
     close(true);
     ctx = c;
     const video = h('video', { controls: true, autoplay: true });
     const msg = h('div', { class: 'msg', text: 'Loading...' });
+    video.volume = Number(localStorage.getItem('vol') || 1);
+    speedSel = h('select', { title: 'Speed ( [ and ] )' }, SPEEDS.map(x => h('option', { value: x, text: x + 'x' })));
+    speedSel.value = '1';
+    speedSel.addEventListener('change', () => { video.playbackRate = Number(speedSel.value); });
     const bar = h('div', { class: 'bar' },
       h('button', { class: 'btn ghost', text: '← Back', onclick: () => close() }),
       h('div', { class: 't', dir: 'auto', text: c.title }),
+      speedSel,
+      h('button', { class: 'btn ghost', text: '🔊 Audio', onclick: () => audioMenu(video) }),
+      h('button', { class: 'btn ghost', text: '💬 Subtitles', onclick: () => subMenu(video) }),
+      h('button', { class: 'btn ghost', text: '⤢', title: 'Picture: Fit / Zoom / Stretch (Z)', onclick: () => Fit.cycle() }),
+      h('button', { class: 'btn ghost', text: '😴', title: 'Sleep timer (S)', onclick: () => Sleep.cycle() }),
       c.next ? h('button', { class: 'btn ghost', text: 'Next ⏭', onclick: () => playNext() }) : null);
     el = h('div', { id: 'vod' }, bar, video, msg);
     document.body.append(el);
@@ -49,8 +83,12 @@ const VodPlayer = (() => {
       case 'Escape': close(); return true;
       case 'ArrowLeft': v.currentTime = Math.max(0, v.currentTime - (e.shiftKey ? 60 : 10)); return true;
       case 'ArrowRight': v.currentTime = v.currentTime + (e.shiftKey ? 60 : 10); return true;
-      case 'ArrowUp': v.volume = Math.min(1, v.volume + 0.05); toast('Volume ' + Math.round(v.volume * 100) + '%', 800); return true;
-      case 'ArrowDown': v.volume = Math.max(0, v.volume - 0.05); toast('Volume ' + Math.round(v.volume * 100) + '%', 800); return true;
+      case 'ArrowUp': v.volume = Math.min(1, v.volume + 0.05); localStorage.setItem('vol', String(v.volume)); toast('Volume ' + Math.round(v.volume * 100) + '%', 800); return true;
+      case 'ArrowDown': v.volume = Math.max(0, v.volume - 0.05); localStorage.setItem('vol', String(v.volume)); toast('Volume ' + Math.round(v.volume * 100) + '%', 800); return true;
+      case ']': setSpeed(v, 1); return true;
+      case '[': setSpeed(v, -1); return true;
+      case 'z': case 'Z': Fit.cycle(); return true;
+      case 's': case 'S': Sleep.cycle(); return true;
       case ' ': v.paused ? v.play() : v.pause(); return true;
       case 'm': case 'M': v.muted = !v.muted; return true;
       case 'f': case 'F': native.isFullscreen().then(f => native.fullscreen(!f)); return true;
@@ -305,6 +343,12 @@ function createSettings() {
     page.replaceChildren(h('h2', { text: 'Settings' }),
       row('Live stream format', 'If channels do not start, try the other format.', fmt),
       row('Secure DNS (DoH)', 'Helps when your provider or router blocks the IPTV server name. If the server still does not open, try another one.', dns),
+      row('Subtitle size', 'For subtitle files loaded in a movie (also A− / A+ in the Subtitles window).', (() => {
+        const sz = h('select', {}, [20, 24, 28, 34, 40, 48].map(n => h('option', { value: n, text: String(n) })));
+        sz.value = String(S.subSize || 28);
+        sz.addEventListener('change', () => { S.subSize = Number(sz.value); Store.save(); Subs.applyCss(); toast('Saved'); });
+        return sz;
+      })()),
       row('Updates', 'Looks for a newer Windows build and installs it.', h('button', { class: 'btn', text: '⬆ Check now', onclick: () => Updater.check(false) })),
       row('Error Log', 'What failed and what the server answered (passwords are hidden). Send it when something does not play.', h('button', { class: 'btn ghost', text: '🪲 Open', onclick: () => openLog() })),
       row('Backup & Restore', 'Saves your playlists, favorites and progress to a file (it contains your account passwords: keep it private).', h('div', { style: { display: 'flex', gap: '8px' } },
@@ -313,7 +357,7 @@ function createSettings() {
       row('Full screen', 'F11 also works.', h('button', { class: 'btn', text: '⛶ Toggle', onclick: () => native.isFullscreen().then(f => native.fullscreen(!f)) })),
       row('Clear saved lists', 'Deletes the saved copy of the channel / movie / series lists (they are downloaded again).', h('button', { class: 'btn burg', text: 'Clear & reload', onclick: async () => { const l = Store.list(); if (l) { await Content.reload(l); for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate(); toast('Cleared'); Preload.run(); } } })),
       h('div', { class: 'setrow' }, h('div', {}, h('div', { text: 'Keyboard' }),
-        h('div', { class: 'd', text: 'Live: ↑/↓ change channel, Enter full screen · Full screen: ←/→ change channel, ↑/↓ volume, Space pause, Esc exit · Movies: ←/→ seek 10 s (Shift 60 s), N next episode · / search' }))));
+        h('div', { class: 'd', text: 'Live: ↑/↓ change channel, Enter full screen · Full screen: ←/→ change channel, ↑/↓ volume, Space pause, M mute, Z picture mode, S sleep timer, Esc exit · Movies: ←/→ seek 10 s (Shift 60 s), [ ] speed, N next episode, Z picture mode, S sleep timer · / search' }))));
   }
   function row(t, d, ctrl) { return h('div', { class: 'setrow' }, h('div', {}, h('div', { text: t }), h('div', { class: 'd', text: d })), ctrl); }
   return { el: root, show() { root.classList.remove('hidden'); draw(); }, hide() { root.classList.add('hidden'); }, onKey() { return false; } };
