@@ -158,3 +158,27 @@ body.fs #nav{display:none}
 .poster .wt{position:absolute;left:6px;bottom:6px;background:#1f9d57e6;color:#fff;border-radius:50%;width:22px;height:22px;display:grid;place-items:center;font-size:13px;font-weight:700}
 .poster .fv + .wt{bottom:6px}
 .logbox{background:#050914;border:1px solid var(--line);border-radius:8px;padding:10px;max-height:55vh;overflow:auto;font:12px/1.5 Consolas,monospace;white-space:pre-wrap;word-break:break-all;min-width:560px}
+
+.arch{font-size:12px;opacity:.8}
+.epgbox{display:flex;flex-direction:column;gap:6px;padding:4px 2px}
+.epgbox .enow,.epgbox .enext{display:flex;align-items:center;gap:10px;font-size:14px}
+.epgbox .tag{font-size:11px;font-weight:700;padding:1px 7px;border-radius:4px;background:var(--burg);color:#fff}
+.epgbox .enext .tag{background:var(--panel2)}
+.epgbox .tt{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.epgbox .tm{color:var(--muted);font-size:12px}
+.epgbox .enone{color:var(--muted);font-size:13px}
+.prog{height:4px;background:var(--panel2);border-radius:3px;overflow:hidden}
+.prog i{display:block;height:100%;background:var(--blue)}
+.guide{width:min(680px,92vw);display:flex;flex-direction:column;gap:8px}
+.guide .ghead{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.guide h3{margin:0}
+.gnote{color:var(--gold);font-size:13px}
+.glist{overflow:auto;max-height:62vh;border:1px solid var(--line);border-radius:8px}
+.gday{position:sticky;top:0;background:var(--panel2);padding:6px 12px;font-weight:700;font-size:13px;color:var(--gold);z-index:1}
+.grow{border-bottom:1px solid rgba(34,48,95,.45)}
+.grow .gmain{display:flex;align-items:center;gap:12px;padding:8px 12px;cursor:pointer}
+.grow .gtm{width:74px;white-space:nowrap;color:var(--muted);font-size:13px;flex:0 0 auto}
+.grow .gtt{flex:1;min-width:0}
+.grow.past .gtt{color:var(--muted)}
+.grow.now{background:linear-gradient(90deg,var(--burg),transparent)}
+.grow .gdesc{padding:0 12px 10px 78px;color:var(--muted);font-size:13px;line-height:1.5}
