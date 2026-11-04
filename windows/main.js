@@ -48,7 +48,7 @@ async function getText(url) {
 }
 
 const slimmers = {
-  live: (a, cats) => a.map(x => ({ i: x.stream_id, n: x.name || '', l: x.stream_icon || '', g: cats[x.category_id] || 'Other', e: x.epg_channel_id || '' })),
+  live: (a, cats) => a.map(x => ({ i: x.stream_id, n: x.name || '', l: x.stream_icon || '', g: cats[x.category_id] || 'Other', e: x.epg_channel_id || '', d: Number(x.tv_archive) === 1 ? (Number(x.tv_archive_duration) || 1) : 0 })),
   movies: (a, cats) => a.map(x => ({ i: x.stream_id, n: x.name || '', p: x.stream_icon || '', g: cats[x.category_id] || 'Other', r: Number(x.rating) || 0, a: Number(x.added) || 0, e: x.container_extension || 'mp4' })),
   series: (a, cats) => a.map(x => ({ i: x.series_id, n: x.name || '', p: x.cover || '', g: cats[x.category_id] || 'Other', r: Number(x.rating) || 0, a: Number(x.last_modified) || 0 }))
 };
