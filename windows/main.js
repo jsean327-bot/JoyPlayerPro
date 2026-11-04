@@ -156,6 +156,33 @@ ipcMain.handle('xmltv:get', async (_e, url, id, name) => {
   return (g.progs.get(key) || []).map(p => ({ start: p[0], end: p[1], title: p[2], desc: p[3] }));
 });
 
+// ---------- Chromecast + external player ----------
+const Cast = require('./cast');
+const castSes = new Cast.Session();
+ipcMain.handle('cast:scan', () => Cast.scan(3500));
+ipcMain.handle('cast:play', async (_e, dev, media, at) => {
+  try { await castSes.play(dev.host, dev.port, media, at); return { ok: true }; }
+  catch (e) { return { ok: false, error: e && e.message ? e.message : String(e) }; }
+});
+ipcMain.handle('cast:status', () => castSes.status);
+ipcMain.handle('cast:ctl', (_e, cmd, val) => { castSes.control(cmd, val); return true; });
+ipcMain.handle('cast:stop', () => { castSes.stop(); return true; });
+ipcMain.handle('ext:play', async (_e, url, title) => {
+  const { spawn } = require('child_process');
+  const pf = [process.env['ProgramFiles'], process.env['ProgramFiles(x86)'], process.env['LOCALAPPDATA'] && path.join(process.env['LOCALAPPDATA'], 'Programs')].filter(Boolean);
+  const cands = [];
+  for (const b of pf) { cands.push(path.join(b, 'VideoLAN', 'VLC', 'vlc.exe'), path.join(b, 'DAUM', 'PotPlayer', 'PotPlayerMini64.exe'), path.join(b, 'MPC-HC', 'mpc-hc64.exe'), path.join(b, 'mpv', 'mpv.exe')); }
+  for (const p of cands) {
+    if (fs.existsSync(p)) { try { spawn(p, [url], { detached: true, stdio: 'ignore' }).unref(); return { ok: true, app: path.basename(p) }; } catch { } }
+  }
+  try {   // no known player: a small playlist file opens with whatever program the PC uses for .m3u
+    const f = path.join(app.getPath('temp'), 'joyplayer-open.m3u');
+    fs.writeFileSync(f, '#EXTM3U\n#EXTINF:-1,' + String(title || 'Stream').replace(/[\r\n]/g, ' ') + '\n' + url + '\n');
+    const err = await shell.openPath(f);
+    return err ? { ok: false, error: err } : { ok: true, app: 'default' };
+  } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
+});
+
 // ---------- keep the screen awake while something plays ----------
 let blockerId = null;
 ipcMain.handle('power:awake', (_e, on) => {
