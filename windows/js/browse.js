@@ -165,6 +165,9 @@ function createBrowse(kind) {
     video.addEventListener('volumechange', () => { lVol.value = String(Math.round((video.muted ? 0 : video.volume) * 100)); lMute.textContent = video.muted || video.volume === 0 ? '🔇' : (video.volume < 0.5 ? '🔉' : '🔊'); });
     video.addEventListener('play', () => { lPlay.textContent = '⏸'; });
     video.addEventListener('pause', () => { lPlay.textContent = '▶'; });
+    const pPlay = h('button', { class: 'btn', text: '⏸', title: 'Play / Pause (Space)', onclick: () => { video.paused ? video.play().catch(() => { }) : video.pause(); } });
+    video.addEventListener('play', () => { pPlay.textContent = '⏸'; });
+    video.addEventListener('pause', () => { pPlay.textContent = '▶'; });
     const lbar = h('div', { class: 'lbar' },
       h('button', { class: 'cb', text: '⏮', title: 'Previous channel (←)', onclick: () => zap(-1) }),
       lPlay,
@@ -181,7 +184,11 @@ function createBrowse(kind) {
     pfav = h('button', { class: 'btn ghost', text: '★ Favorite', onclick: () => { if (S.sel) toggleFav(S.sel); } });
     epgBox = h('div', { class: 'epgbox' });
     const pane = h('div', { class: 'live-pane' }, stage,
-      h('div', { class: 'pinfo' }, ptitle, pfav,
+      h('div', { class: 'pinfo' },
+        h('button', { class: 'btn ghost', text: '⏮', title: 'Previous channel', onclick: () => zap(-1) }),
+        pPlay,
+        h('button', { class: 'btn ghost', text: '⏭', title: 'Next channel', onclick: () => zap(1) }),
+        ptitle, pfav,
         h('button', { class: 'btn ghost', text: '📅 Guide', title: 'Program guide and catch-up', onclick: () => openGuide() }),
         h('button', { class: 'btn ghost', text: '📡', title: 'Cast to TV', onclick: castLive }),
         h('button', { class: 'btn ghost', text: '🖥', title: 'Open in VLC / another player', onclick: extLive }),
@@ -190,13 +197,15 @@ function createBrowse(kind) {
     cols.append(pane);
     stage.addEventListener('dblclick', () => { if (S.theater) exitTheater(); else enterTheater(); });
     stage.addEventListener('mousemove', wake);
+    document.addEventListener('mousemove', () => { if (S.theater) wake(); });
+    document.addEventListener('mousedown', () => { if (S.theater) wake(); });
     stage.addEventListener('wheel', (e) => { if (S.theater) { vol(e.deltaY < 0 ? 0.05 : -0.05); } }, { passive: true });
     video.addEventListener('click', () => { if (S.theater) { video.paused ? video.play() : video.pause(); } });
   }
   function wake() {
     if (!stage) return;
     stage.classList.remove('idle'); clearTimeout(idleTimer);
-    if (S.theater) idleTimer = setTimeout(() => stage.classList.add('idle'), 3000);
+    if (S.theater) idleTimer = setTimeout(() => { if (video.paused) wake(); else stage.classList.add('idle'); }, 4000);
   }
   function vol(d) {
     video.muted = false; video.volume = Math.min(1, Math.max(0, video.volume + d));
