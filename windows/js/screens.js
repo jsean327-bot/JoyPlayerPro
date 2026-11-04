@@ -401,6 +401,8 @@ function createSettings() {
     });
     page.replaceChildren(h('h2', { text: 'Settings' }),
       row('Language', 'Choose the language of the app.', lang),
+      row('Hide categories', 'Choose the categories you never want to see (Live, Movies, Series).', h('button', { class: 'btn', text: '🙈 Choose', onclick: () => { if (Parental.hasPin()) Parental.askPin(() => catPicker('hide')); else catPicker('hide'); } })),
+      parentalRow(),
       row('Live stream format', 'If channels do not start, try the other format.', fmt),
       row('Secure DNS (DoH)', 'Helps when your provider or router blocks the IPTV server name. If the server still does not open, try another one.', dns),
       row('Subtitle size', 'For subtitle files loaded in a movie (also A− / A+ in the Subtitles window).', (() => {
@@ -418,6 +420,61 @@ function createSettings() {
       row('Clear saved lists', 'Deletes the saved copy of the channel / movie / series lists (they are downloaded again).', h('button', { class: 'btn burg', text: 'Clear & reload', onclick: async () => { const l = Store.list(); if (l) { await Content.reload(l); for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate(); toast('Cleared'); Preload.run(); } } })),
       h('div', { class: 'setrow' }, h('div', {}, h('div', { text: 'Keyboard' }),
         h('div', { class: 'd', text: 'Live: ↑/↓ change channel, Enter full screen · Full screen: ←/→ change channel, ↑/↓ volume, Space pause, M mute, Z picture mode, S sleep timer, Esc exit · Movies: ←/→ seek 10 s (Shift 60 s), [ ] speed, N next episode, Z picture mode, S sleep timer · / search' }))));
+  }
+
+  /** Window with a checkbox per category (Live / Movies / Series): mode 'hide' = never shown, 'lock' = asks for the PIN. */
+  async function catPicker(mode) {
+    const list = Store.list(); if (!list) return toast('Add a playlist first');
+    const u = Store.user(list);
+    let kind = 'live';
+    const kinds = list.type === 'xtream' ? ['live', 'movies', 'series'] : ['live'];
+    const names = { live: 'Live', movies: 'Movies', series: 'Series' };
+    const tabs = h('div', { class: 'seasons' });
+    const box = h('div', { style: { maxHeight: '55vh', overflow: 'auto', marginTop: '8px' } });
+    const q = h('input', { type: 'search', placeholder: 'Search...', style: { width: '100%' } });
+    const m = modal(h('div', { class: 'card form', style: { width: 'min(520px,94vw)' } },
+      h('h3', { text: mode === 'hide' ? '🙈 ' + tr('Hide categories') : '🔒 ' + tr('Lock categories (ask for the PIN)') }), tabs, q, box,
+      h('div', { class: 'acts' }, h('button', { class: 'btn', text: 'Done', onclick: () => m.close() }))), () => {
+      for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate();
+    });
+    const draw = async () => {
+      tabs.replaceChildren(...kinds.map(k => h('button', { class: 'chip' + (k === kind ? ' on' : ''), text: names[k], onclick: () => { kind = k; draw(); } })));
+      box.replaceChildren(spinner('Loading...'));
+      let data; try { data = await Content.get(list, kind); } catch (e) { box.replaceChildren(h('div', { class: 'empty', text: 'Could not load the list' })); return; }
+      const sel = new Set(u[mode][kind]);
+      const f = norm(q.value || '');
+      const rows = data.cats.filter(c => !f || norm(c.name).includes(f)).map(c => {
+        const cb = h('input', { type: 'checkbox' }); cb.checked = sel.has(c.name);
+        cb.addEventListener('change', () => { if (cb.checked) sel.add(c.name); else sel.delete(c.name); u[mode][kind] = [...sel]; Store.save(); });
+        return h('label', { style: { display: 'flex', gap: '10px', alignItems: 'center', padding: '6px 4px', cursor: 'pointer' } }, cb, h('span', { dir: 'auto', style: { flex: 1 }, text: c.name }), h('span', { style: { color: 'var(--muted)' }, text: String(c.count) }));
+      });
+      box.replaceChildren(...(rows.length ? rows : [h('div', { class: 'empty', text: 'Nothing here' })]));
+    };
+    q.addEventListener('input', draw);
+    draw();
+  }
+  function setPin(done) {
+    const mk = (ph) => h('input', { type: 'password', inputmode: 'numeric', maxlength: 8, placeholder: ph, style: { width: '100%', marginBottom: '8px' } });
+    const a = mk(tr('New PIN (4-8 digits)')), b2 = mk(tr('Repeat the PIN'));
+    const m = modal(h('div', { class: 'card form' }, h('h3', { text: '🔒 ' + tr('Set a PIN') }), a, b2,
+      h('div', { class: 'acts' }, h('button', { class: 'btn ghost', text: 'Cancel', onclick: () => m.close() }),
+        h('button', { class: 'btn', text: 'Save', onclick: () => {
+          if (!/^\d{4,8}$/.test(a.value)) return toast('The PIN must be 4 to 8 digits');
+          if (a.value !== b2.value) return toast('The two PINs are different');
+          Store.state.settings.pin = a.value; Store.save(); m.close(); toast('Saved'); done();
+        } }))));
+    setTimeout(() => a.focus(), 50);
+  }
+  function parentalRow() {
+    const has = Parental.hasPin();
+    const gate = (fn) => has ? Parental.askPin(fn) : fn();
+    const kids = [];
+    if (!has) kids.push(h('button', { class: 'btn', text: '🔒 Set a PIN', onclick: () => setPin(draw) }));
+    else kids.push(
+      h('button', { class: 'btn', text: '🔒 Lock categories', onclick: () => catPicker('lock') }),
+      h('button', { class: 'btn ghost', text: 'Change PIN', onclick: () => Parental.askPin(() => setPin(draw), 'Enter the current PIN') }),
+      h('button', { class: 'btn burg', text: 'Remove PIN', onclick: () => Parental.askPin(() => { delete Store.state.settings.pin; Parental.unlocked.clear(); Store.save(); for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate(); draw(); toast('PIN removed'); }, 'Enter the current PIN') }));
+    return row('Parental control', 'A PIN protects the categories you lock (children cannot open them). Hidden categories never show.', h('div', { style: { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' } }, ...kids));
   }
   function row(t, d, ctrl) { return h('div', { class: 'setrow' }, h('div', {}, h('div', { text: t }), h('div', { class: 'd', text: d })), ctrl); }
   return { el: root, show() { root.classList.remove('hidden'); draw(); }, hide() { root.classList.add('hidden'); }, onKey() { return false; } };
