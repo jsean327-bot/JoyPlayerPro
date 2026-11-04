@@ -274,6 +274,8 @@ function createBrowse(kind) {
         case 'ArrowDown': vol(-0.05); return true;
         case ' ': video.paused ? video.play() : video.pause(); return true;
         case 'm': case 'M': video.muted = !video.muted; return true;
+        case 'z': case 'Z': Fit.cycle(); return true;
+        case 's': case 'S': Sleep.cycle(); return true;
         case 'Enter': exitTheater(); return true;
       }
       return false;
