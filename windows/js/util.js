@@ -26,6 +26,34 @@ function norm(s) {
 function sortKey(s) { return norm(s).replace(/^[^\p{L}\p{N}]+/u, ''); }
 const collator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
+/** Short in-app log (Settings > Error Log): what failed and what the server answered. */
+const AppLog = {
+  lines: [],
+  async load() {
+    try { const t = await native.read('log'); if (t) this.lines = JSON.parse(t); } catch (e) { }
+  },
+  add(tag, msg) {
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+    this.lines.unshift(`${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())} [${tag}] ${String(msg).replace(/\/(live|movie|series)\/[^/\s]+\/[^/\s]+\//g, '/$1/•••/•••/')}`);
+    if (this.lines.length > 200) this.lines.length = 200;
+    this.save();
+  },
+  save: debounce(() => { native.write('log', JSON.stringify(AppLog.lines)); }, 1500),
+  clear() { this.lines = []; native.write('log', '[]'); },
+  text() { return 'JoyPlayer IPTV Pro (Windows) - error report\n\n' + (this.lines.join('\n') || '(empty)'); }
+};
+
+/** Keeps the screen on while a player is playing. */
+const KeepAwake = {
+  s: new Set(),
+  set(who, on) {
+    const had = this.s.size > 0;
+    if (on) this.s.add(who); else this.s.delete(who);
+    if ((this.s.size > 0) !== had) native.awake(this.s.size > 0);
+  }
+};
+
 let toastTimer = 0;
 function toast(msg, ms) {
   const t = $('#toast');
