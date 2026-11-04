@@ -298,13 +298,18 @@ function createPlaylists() {
     if (i < 0 || j < 0 || j >= a.length) return;
     [a[i], a[j]] = [a[j], a[i]]; Store.save(); draw();
   }
+  const shown = new Set();
+  const hideTxt = (t) => { t = String(t || ''); return t.slice(0, 2) + '••••••'; };
+  const hideUrl = (u) => String(u || '').replace(/(username|password|user|pass)=([^&]*)/gi, (m, k) => k + '=••••••');
   function draw() {
     page.replaceChildren(h('h2', { text: 'Playlists' }));
     const grid = h('div', { class: 'plist' });
     for (const l of Store.state.lists) {
       grid.append(h('div', { class: 'pl' + (l.id === Store.state.active ? ' act' : '') },
         h('div', { class: 'n', dir: 'auto', text: l.name }),
-        h('div', { class: 'u', text: l.type === 'm3u' ? l.url : baseOf(l) + '  •  ' + l.user }),
+        h('div', { class: 'u', style: { cursor: 'pointer' }, title: tr('Click to show / hide the account details'),
+          text: shown.has(l.id) ? (l.type === 'm3u' ? l.url : baseOf(l) + '  •  ' + l.user) : (l.type === 'm3u' ? hideUrl(l.url) : baseOf(l) + '  •  ' + hideTxt(l.user)),
+          onclick: () => { shown.has(l.id) ? shown.delete(l.id) : shown.add(l.id); draw(); } }),
         h('div', { class: 'r' },
           h('button', { class: 'btn small', text: l.id === Store.state.active ? '✓ In use' : 'Use', onclick: () => {
             Store.state.active = l.id; Store.save();
