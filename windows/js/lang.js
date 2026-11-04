@@ -52,7 +52,8 @@ const Lang = {
     const t = (this.col >= 0 && this.ex.get(key)) || key;
     return t.replace(/\{(\d)\}/g, (_, i) => args[+i]);
   },
-  rows: `Home|الرئيسية|Accueil|Inicio|Start|Home|Início|Главная|Ana sayfa|Strona główna|Αρχική|Start|Acasă|Hem|Головна
+  rows: `Click to show / hide the account details|اضغط لإظهار/إخفاء بيانات الحساب|Cliquer pour afficher / masquer les détails du compte|Clic para mostrar / ocultar los datos de la cuenta|Klicken, um Kontodaten ein-/auszublenden|Clic per mostrare / nascondere i dati dell'account|Clique para mostrar / ocultar os dados da conta|Нажмите, чтобы показать / скрыть данные аккаунта|Hesap bilgilerini göstermek / gizlemek için tıklayın|Kliknij, aby pokazać / ukryć dane konta|Κάντε κλικ για εμφάνιση / απόκρυψη στοιχείων λογαριασμού|Klik om accountgegevens te tonen / verbergen|Clic pentru a afișa / ascunde datele contului|Klicka för att visa / dölja kontouppgifter|Натисніть, щоб показати / приховати дані облікового запису
+Home|الرئيسية|Accueil|Inicio|Start|Home|Início|Главная|Ana sayfa|Strona główna|Αρχική|Start|Acasă|Hem|Головна
 Live|مباشر|En direct|En vivo|Live|Diretta|Ao vivo|Эфир|Canlı|Na żywo|Ζωντανά|Live|Live|Live|Наживо
 Movies|الأفلام|Films|Películas|Filme|Film|Filmes|Фильмы|Filmler|Filmy|Ταινίες|Films|Filme|Filmer|Фільми
 Series|المسلسلات|Séries|Series|Serien|Serie|Séries|Сериалы|Diziler|Seriale|Σειρές|Series|Seriale|Serier|Серіали
