@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, net, shell, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, session, net, shell, Menu, powerSaveBlocker, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -101,6 +101,73 @@ ipcMain.handle('m3u:load', async (_e, url) => {
   return parseM3u(text);
 });
 
+// ---------- keep the screen awake while something plays ----------
+let blockerId = null;
+ipcMain.handle('power:awake', (_e, on) => {
+  if (on && blockerId === null) blockerId = powerSaveBlocker.start('prevent-display-sleep');
+  else if (!on && blockerId !== null) { try { powerSaveBlocker.stop(blockerId); } catch {} blockerId = null; }
+  return true;
+});
+
+// ---------- secure DNS (DoH): 0 = off, 1 Cloudflare, 2 Google, 3 Quad9 ----------
+const DOH = { 1: 'https://cloudflare-dns.com/dns-query', 2: 'https://dns.google/dns-query', 3: 'https://dns.quad9.net/dns-query' };
+function dohFile() { return path.join(storeDir(), 'doh.json'); }
+function dohMode() { try { return Number(JSON.parse(fs.readFileSync(dohFile(), 'utf8')).mode) || 0; } catch { return 0; } }
+function applyDoh(mode) {
+  try {
+    if (mode && DOH[mode]) app.configureHostResolver({ secureDnsMode: 'automatic', secureDnsServers: [DOH[mode]] });   // automatic = falls back to the normal DNS
+    else app.configureHostResolver({ secureDnsMode: 'off', secureDnsServers: [] });
+  } catch {}
+}
+ipcMain.handle('doh:get', () => dohMode());
+ipcMain.handle('doh:set', (_e, mode) => {
+  mode = Number(mode) || 0;
+  fs.writeFileSync(dohFile(), JSON.stringify({ mode }));
+  applyDoh(mode);
+  return mode;
+});
+
+// ---------- backup / restore ----------
+ipcMain.handle('backup:export', async (_e, text) => {
+  const r = await dialog.showSaveDialog(win, { title: 'Save backup', defaultPath: 'JoyPlayer-backup.json', filters: [{ name: 'JSON', extensions: ['json'] }] });
+  if (r.canceled || !r.filePath) return false;
+  await fs.promises.writeFile(r.filePath, text, 'utf8');
+  return r.filePath;
+});
+ipcMain.handle('backup:import', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Choose a backup file', properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  return await fs.promises.readFile(r.filePaths[0], 'utf8');
+});
+
+// ---------- updates (Windows releases are tagged win-<build number>; the build number is the 3rd part of the version) ----------
+const REPO = 'jsean327-bot/JoyPlayerPro';
+ipcMain.handle('update:check', async () => {
+  const cur = Number((app.getVersion().split('.')[2]) || 0);
+  const res = await net.fetch(`https://api.github.com/repos/${REPO}/releases?per_page=30`, { headers: { 'Accept': 'application/vnd.github+json' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const rels = (await res.json()).filter(r => /^win-\d+$/.test(r.tag_name));
+  rels.sort((a, b) => Number(b.tag_name.slice(4)) - Number(a.tag_name.slice(4)));
+  const rel = rels[0];
+  if (!rel) return { newer: false, cur, n: 0 };
+  const n = Number(rel.tag_name.slice(4));
+  const portable = !!process.env.PORTABLE_EXECUTABLE_DIR;
+  const want = `JoyPlayer-IPTV-Pro-${portable ? 'Portable' : 'Setup'}-${process.arch}.exe`;
+  const asset = (rel.assets || []).find(a => a.name === want);
+  return { newer: n > cur && cur > 0, cur, n, url: asset ? asset.browser_download_url : '', name: asset ? asset.name : '', page: rel.html_url, portable };
+});
+ipcMain.handle('update:install', async (_e, url, name, portable) => {
+  if (!/^https:\/\/github\.com\//.test(url) || !/^[\w.-]+\.exe$/.test(name)) throw new Error('Bad update link');
+  const res = await net.fetch(url, { redirect: 'follow' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const dest = path.join(app.getPath('temp'), name);
+  await fs.promises.writeFile(dest, Buffer.from(await res.arrayBuffer()));
+  if (portable) { shell.showItemInFolder(dest); return 'folder'; }
+  await shell.openPath(dest);
+  setTimeout(() => app.quit(), 800);
+  return 'installer';
+});
+
 // ---------- window ----------
 ipcMain.handle('win:fullscreen', (_e, on) => {
   if (!win) return false;
@@ -145,6 +212,7 @@ app.whenReady().then(() => {
     delete h['Referer'];
     cb({ requestHeaders: h });
   });
+  applyDoh(dohMode());
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
