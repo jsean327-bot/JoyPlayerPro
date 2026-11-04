@@ -90,7 +90,7 @@ function createBrowse(kind) {
     const words = norm(S.q).split(' ').filter(Boolean);
     if (words.length) { Content.ensureIndex(S.data); arr = arr.filter(it => words.every(w => it._s.includes(w))); }
     S.shown = sortItems(arr);
-    countLbl.textContent = S.shown.length.toLocaleString() + ' items';
+    countLbl.textContent = trf('{0} items', S.shown.length.toLocaleString());
     updateItemsView(keepScroll);
   }
   let itemList = null, gridCols = 1;
@@ -110,7 +110,7 @@ function createBrowse(kind) {
       h('span', { class: 'num', text: i + 1 }),
       it.l ? h('img', { src: it.l, loading: 'lazy', onerror: (e) => { e.target.style.visibility = 'hidden'; } }) : h('span', { style: { width: '40px' } }),
       h('span', { class: 'nm', dir: 'auto', text: it.n }),
-      it.d > 0 ? h('span', { class: 'arch', text: '⏪', title: 'Catch-up: ' + it.d + ' days' }) : null,
+      it.d > 0 ? h('span', { class: 'arch', text: '⏪', title: trf('Catch-up: {0} days', it.d) }) : null,
       h('span', { class: 'fv' + (S.favSet.has(it.i) ? ' on' : ''), text: '★', title: 'Favorite', onclick: (e) => { e.stopPropagation(); toggleFav(it); } }));
   }
   function posterRow(r) {
@@ -169,19 +169,19 @@ function createBrowse(kind) {
   }
   function vol(d) {
     video.muted = false; video.volume = Math.min(1, Math.max(0, video.volume + d));
-    localStorage.setItem('vol', String(video.volume)); toast('Volume ' + Math.round(video.volume * 100) + '%', 900);
+    localStorage.setItem('vol', String(video.volume)); toast(trf('Volume {0}%', Math.round(video.volume * 100)), 900);
   }
   function playSel() {
     const it = S.sel; if (!it || !isLive) return;
     ptitle.textContent = it.n; topEl.textContent = it.n;
     pfav.className = 'btn ghost' + (S.favSet.has(it.i) ? ' burg' : '');
-    msgEl.textContent = 'Connecting...'; msgEl.classList.remove('hidden');
+    msgEl.textContent = tr('Connecting...'); msgEl.classList.remove('hidden');
     const u = Store.user(S.list);
     u.recent = [it.i, ...u.recent.filter(x => x !== it.i)].slice(0, 60); Store.save();
     paintEpg();
     engine.live(Urls.live(S.list, it), {
       playing: () => msgEl.classList.add('hidden'),
-      status: (m) => { msgEl.textContent = m; msgEl.classList.remove('hidden'); },
+      status: (m) => { msgEl.textContent = tr(m); msgEl.classList.remove('hidden'); },
       error: (m) => { msgEl.textContent = m; msgEl.classList.remove('hidden'); AppLog.add('live', it.n + ' | ' + m); }
     });
   }
@@ -197,7 +197,7 @@ function createBrowse(kind) {
       catchup: (p) => {
         const url = Epg.catchupUrl(S.list, it, p);
         clearTimeout(selTimer); engine.stop();                // the live channel must release its connection first
-        msgEl.textContent = 'Catch-up playing'; msgEl.classList.remove('hidden');
+        msgEl.textContent = tr('Catch-up playing'); msgEl.classList.remove('hidden');
         VodPlayer.open({ title: it.n + ' — ' + p.title + ' (' + Epg.hm(p.start) + ')', url, stream: true, onClose: () => { if (S.sel) playSel(); } });
       }
     });
@@ -246,10 +246,10 @@ function createBrowse(kind) {
     for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate();
     App.show(App.current, true);
   }
-  const loadingEl = () => spinner('Loading ' + title.toLowerCase() + '...');
+  const loadingEl = () => spinner('Loading...');
   async function load() {
     const list = Store.list(); S.list = list;
-    if (!list) { showEmpty('Add a playlist first (Playlists page).'); return; }
+    if (!list) { showEmpty('Add a playlist first'); return; }
     if (!isLive && list.type !== 'xtream') { showEmpty('Movies and Series need an Xtream Codes playlist.'); return; }
     if (S.loadedFor === list.id && S.data) return;
     const sp = loadingEl(); root.append(sp);
@@ -260,7 +260,7 @@ function createBrowse(kind) {
       S.cat = '*all*'; S.q = ''; search.value = ''; S.sel = null; S.loadedFor = list.id;
       computeFavCount(); build(); buildCats(); refreshShown();
     } catch (e) {
-      showEmpty('Could not load the list: ' + (e && e.message ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : e));
+      showEmpty(trf('Could not load the list: {0}', (e && e.message ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : e)));
     } finally { sp.remove(); }
   }
   function showEmpty(text) {
