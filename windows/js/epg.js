@@ -17,6 +17,7 @@ const Epg = {
       .filter(p => p.start && p.end).sort((a, b) => a.start - b.start);
   },
   async load(list, it, action, extra) {
+    if (list.type === 'm3u') return this.loadM3u(list, it, action === 'get_short_epg');
     if (list.type !== 'xtream') return [];
     const key = action + '|' + list.id + '|' + it.i;
     const hit = this.cache.get(key);
@@ -29,6 +30,24 @@ const Epg = {
     if (v.length) this.cache.set(key, { t: Date.now(), v });
     return v;
   },
+  /** M3U playlists: the guide comes from an XMLTV file (the playlist's own url-tvg, or a link typed in the playlist form). */
+  async loadM3u(list, it, short) {
+    const url = list.epgUrl || list.epg;
+    if (!url) return [];
+    const key = 'x|' + list.id + '|' + it.i;
+    let v = this.cache.get(key);
+    if (!v || Date.now() - v.t > 5 * 60000) {
+      let arr = [];
+      try { arr = (await native.xmltv(url, it.e || '', it.n || '')).filter(p => p.title); if (!arr.length) AppLog.add('epg', 'xmltv: no listings for ' + it.n); }
+      catch (e) { AppLog.add('epg', 'xmltv failed: ' + (e && e.message ? e.message : e)); }
+      v = { t: Date.now(), v: arr };
+      if (arr.length) this.cache.set(key, v);
+    }
+    if (!short) return v.v;
+    const now = Date.now() / 1000;
+    return v.v.filter(p => p.end > now).slice(0, 12);
+  },
+  hasGuide(list) { return list.type === 'xtream' || !!(list.epgUrl || list.epg); },
   short(list, it) { return this.load(list, it, 'get_short_epg', '&limit=12'); },
   full(list, it) { return this.load(list, it, 'get_simple_data_table'); },
   hm(sec) { return new Date(sec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); },
@@ -46,7 +65,7 @@ const Epg = {
   },
   /** "Now / Next" block under the preview. isCurrent() tells whether the channel is still the selected one. Returns the current title. */
   async paint(box, list, it, isCurrent) {
-    if (list.type !== 'xtream') { box.replaceChildren(); return ''; }
+    if (!this.hasGuide(list)) { box.replaceChildren(); return ''; }
     const items = await this.short(list, it);
     if (!isCurrent()) return '';
     const now = Date.now() / 1000;
