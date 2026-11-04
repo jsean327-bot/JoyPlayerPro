@@ -46,7 +46,7 @@ class Engine {
 
     const step = (k) => {
       if (my !== this.token) return;
-      if (k >= plan.length) { cb.error && cb.error('Could not play this channel (the server did not answer or the format is not supported).' + (diag.length ? '  [' + diag.join(' | ') + ']' : '')); return; }
+      if (k >= plan.length) { cb.error && cb.error(tr('Could not play this channel (the server did not answer or the format is not supported).') + (diag.length ? '  [' + diag.join(' | ') + ']' : '')); return; }
       const [type, url] = plan[k];
       this.stopEngines();
       let settled = false, recovered = false;
@@ -60,7 +60,7 @@ class Engine {
         if (my !== this.token) return;
         if (settled) {                       // stream dropped while watching: reconnect a few times
           if (this.lost++ < 3) setTimeout(() => { if (my === this.token) this.live(urls, cb); }, 1500);
-          else cb.error && cb.error('The stream stopped.');
+          else cb.error && cb.error(tr('The stream stopped.'));
           return;
         }
         settled = true; clearTimeout(timer); v.removeEventListener('playing', onPlaying);
@@ -129,13 +129,13 @@ class Engine {
       if (!ok()) return;
       if (code >= 400 && code < 500) {            // the server refused: asking again only makes it worse
         AppLog.add('vod', 'HTTP ' + code + ' | ' + url);
-        cb.error && cb.error('The server refused the link (HTTP ' + code + ').' + (code === 401 || code === 403 ? ' The account may be in use on another device, a VPN may be blocked, or this title is not in your package.' : ''));
+        cb.error && cb.error(trf('The server refused the link (HTTP {0}).', code) + (code === 401 || code === 403 ? ' ' + tr('The account may be in use on another device, a VPN may be blocked, or this title is not in your package.') : ''));
         return;
       }
-      if (tries >= 6) { AppLog.add('vod', 'gave up after 6 reconnects | ' + url); cb.error && cb.error('Connection lost. Go back and open it again.'); return; }
+      if (tries >= 6) { AppLog.add('vod', 'gave up after 6 reconnects | ' + url); cb.error && cb.error(tr('Connection lost. Go back and open it again.')); return; }
       tries++;
       AppLog.add('vod', 'reconnect #' + tries + ' (' + why + ') at ' + Math.floor(at) + ' s');
-      cb.status && cb.status('Connection lost, reconnecting (' + tries + '/6)...');
+      cb.status && cb.status(trf('Connection lost, reconnecting ({0}/6)...', tries));
       setTimeout(() => { if (ok()) start(at); }, 1500 * tries);
     };
     v.onerror = () => { if (ok()) reconnect('error ' + ((v.error && v.error.code) || '')); };
