@@ -53,13 +53,13 @@ const VodPlayer = (() => {
     const cbs = {
       ready: () => msg.classList.add('hidden'),
       playing: () => msg.classList.add('hidden'),
-      status: (m) => { msg.textContent = m; msg.classList.remove('hidden'); },
+      status: (m) => { msg.textContent = tr(m); msg.classList.remove('hidden'); },
       error: (m) => { msg.textContent = m; msg.classList.remove('hidden'); if (c.stream) AppLog.add('catchup', m); }
     };
     if (c.stream) engine.live({ direct: c.url }, cbs);      // catch-up: a recorded stream, played like a live one
     else engine.vod(c.url, resume, cbs);
     video.addEventListener('playing', () => msg.classList.add('hidden'));
-    video.addEventListener('waiting', () => { msg.textContent = 'Buffering...'; msg.classList.remove('hidden'); });
+    video.addEventListener('waiting', () => { msg.textContent = tr('Buffering...'); msg.classList.remove('hidden'); });
     video.addEventListener('ended', () => { if (!c.stream) Store.saveResume(c.url, 0, 0); if (c.next) playNext(); else close(); });
     saveT = setInterval(() => { if (!c.stream && video.duration && video.currentTime > 5) Store.saveResume(c.url, video.currentTime, video.duration); }, 8000);
     el.addEventListener('mousemove', wake); wake();
@@ -86,8 +86,8 @@ const VodPlayer = (() => {
       case 'Escape': close(); return true;
       case 'ArrowLeft': v.currentTime = Math.max(0, v.currentTime - (e.shiftKey ? 60 : 10)); return true;
       case 'ArrowRight': v.currentTime = v.currentTime + (e.shiftKey ? 60 : 10); return true;
-      case 'ArrowUp': v.volume = Math.min(1, v.volume + 0.05); localStorage.setItem('vol', String(v.volume)); toast('Volume ' + Math.round(v.volume * 100) + '%', 800); return true;
-      case 'ArrowDown': v.volume = Math.max(0, v.volume - 0.05); localStorage.setItem('vol', String(v.volume)); toast('Volume ' + Math.round(v.volume * 100) + '%', 800); return true;
+      case 'ArrowUp': v.volume = Math.min(1, v.volume + 0.05); localStorage.setItem('vol', String(v.volume)); toast(trf('Volume {0}%', Math.round(v.volume * 100)), 800); return true;
+      case 'ArrowDown': v.volume = Math.max(0, v.volume - 0.05); localStorage.setItem('vol', String(v.volume)); toast(trf('Volume {0}%', Math.round(v.volume * 100)), 800); return true;
       case ']': setSpeed(v, 1); return true;
       case '[': setSpeed(v, -1); return true;
       case 'z': case 'Z': Fit.cycle(); return true;
@@ -109,7 +109,7 @@ const Detail = {
     const playIt = (c) => { Store.pushRecentVod(list, kind, it.i); VodPlayer.open(c); };
     const body = h('div', { class: 'info-body' }, spinner('Loading details...'));
     const favBtn = h('button', { class: 'btn ghost', text: fav.fav ? '' : '', onclick: () => { fav.toggleFav(); upd(); } });
-    const upd = () => { favBtn.textContent = fav.fav() ? '★ In favorites' : '☆ Add to favorites'; };
+    const upd = () => { favBtn.textContent = tr(fav.fav() ? '★ In favorites' : '☆ Add to favorites'); };
     upd();
     const poster = h('img', { src: it.p || '', onerror: (e) => { e.target.style.visibility = 'hidden'; } });
     const m = modal(h('div', { class: 'card detail' },
@@ -128,8 +128,8 @@ const Detail = {
     const meta = [info.releasedate || info.releaseDate || '', info.genre || '', info.duration || '', info.rating || it.r ? '★ ' + (info.rating || it.r) : ''].filter(Boolean);
     const acts = h('div', { class: 'acts' });
     const kids = [h('div', { class: 'meta', dir: 'auto', text: meta.join('  •  ') })];
-    if (info.cast) kids.push(h('div', { class: 'meta', dir: 'auto', text: 'Cast: ' + info.cast }));
-    if (info.director) kids.push(h('div', { class: 'meta', dir: 'auto', text: 'Director: ' + info.director }));
+    if (info.cast) kids.push(h('div', { class: 'meta', dir: 'auto', text: tr('Cast: ' + info.cast) }));
+    if (info.director) kids.push(h('div', { class: 'meta', dir: 'auto', text: tr('Director: ' + info.director) }));
     kids.push(h('div', { class: 'plot', dir: 'auto', text: info.plot || info.description || '' }));
     kids.push(acts);
     body.replaceChildren(...kids);
@@ -169,7 +169,7 @@ const Detail = {
             const rs = resumeOf(flat[idx].url);
             return h('div', { class: 'ep' + (done ? ' done' : ''), onclick: () => { m.close(); playIt(playAt(idx)); } },
               h('span', { class: 'en', text: (done ? '✓ ' : '') + e.episode_num }),
-              h('span', { class: 'et', dir: 'auto', text: e.title || ('Episode ' + e.episode_num) }),
+              h('span', { class: 'et', dir: 'auto', text: e.title || tr('Episode ' + e.episode_num) }),
               h('span', { class: 'ed', text: rs > 20 ? 'resume ' + fmtTime(rs) : ((e.info && e.info.duration) || '') }));
           }));
         };
@@ -208,13 +208,13 @@ function createHome() {
   native.version().then(v => { ver.textContent = 'v' + v; });
   async function refresh() {
     const l = Store.list();
-    if (!l) { exp.textContent = 'No playlist yet — open "Change Playlist" to add one'; return; }
+    if (!l) { exp.textContent = tr('No playlist yet — open "Change Playlist" to add one'); return; }
     exp.textContent = l.name;
     try {
       const a = await Account.info(l);
       if (a && a.user_info) {
         const ex = a.user_info.exp_date ? new Date(Number(a.user_info.exp_date) * 1000).toLocaleDateString() : 'Unlimited';
-        exp.textContent = l.name + '  •  Expires: ' + ex;
+        exp.textContent = l.name + '  •  ' + tr('Expires') + ': ' + ex;
       }
     } catch (e) { }
   }
@@ -244,7 +244,7 @@ function createAccount() {
       add('Status', u.status); add('Created', d(u.created_at)); add('Expires', u.exp_date ? d(u.exp_date) : 'Unlimited');
       add('Active connections', u.active_cons); add('Max connections', u.max_connections); add('Trial', u.is_trial === '1' ? 'Yes' : 'No');
       add('Server', s.url); add('Server time', s.time_now);
-    } catch (e) { sp.textContent = 'Could not read the account: ' + e.message; }
+    } catch (e) { sp.textContent = tr('Could not read the account: ' + e.message); }
   }
   return { el: root, show() { root.classList.remove('hidden'); draw(); }, hide() { root.classList.add('hidden'); }, onKey() { return false; } };
 }
@@ -315,7 +315,7 @@ function createPlaylists() {
           h('button', { class: 'btn small ghost', text: '▼', title: 'Move down', onclick: () => move(l, 1) }),
           h('button', { class: 'btn small ghost', text: 'Edit', onclick: () => form(l) }),
           h('button', { class: 'btn small burg', text: 'Delete', onclick: async () => {
-            if (!confirm('Delete "' + l.name + '"?')) return;
+            if (!confirm(trf('Delete "{0}"?', l.name))) return;
             Store.state.lists = Store.state.lists.filter(x => x.id !== l.id);
             if (Store.state.active === l.id) Store.state.active = Store.state.lists[0] ? Store.state.lists[0].id : null;
             await Content.reload(l); Store.save();
@@ -343,7 +343,15 @@ function createSettings() {
     const dns = h('select', {}, h('option', { value: 0, text: 'Off (system DNS)' }), h('option', { value: 1, text: 'Cloudflare' }), h('option', { value: 2, text: 'Google' }), h('option', { value: 3, text: 'Quad9' }));
     native.dohGet().then(v => { dns.value = String(v); });
     dns.addEventListener('change', async () => { await native.dohSet(Number(dns.value)); toast('Secure DNS saved'); });
+    const lang = h('select', {}, Lang.codes.map((c, i) => h('option', { value: c, text: Lang.names[i], dir: 'auto' })));
+    lang.value = Lang.code;
+    lang.addEventListener('change', async () => {
+      S.lang = lang.value;
+      await native.write('state', JSON.stringify(Store.state));
+      location.reload();
+    });
     page.replaceChildren(h('h2', { text: 'Settings' }),
+      row('Language', 'Choose the language of the app.', lang),
       row('Live stream format', 'If channels do not start, try the other format.', fmt),
       row('Secure DNS (DoH)', 'Helps when your provider or router blocks the IPTV server name. If the server still does not open, try another one.', dns),
       row('Subtitle size', 'For subtitle files loaded in a movie (also A− / A+ in the Subtitles window).', (() => {
@@ -387,7 +395,7 @@ async function backupRestore(redraw) {
     if (!t) return;
     const o = JSON.parse(t);
     if (!o || !o.state || !Array.isArray(o.state.lists)) { toast('This is not a JoyPlayer backup'); return; }
-    if (!confirm('Replace the current playlists, favorites and progress with the backup?')) return;
+    if (!confirm(tr('Replace the current playlists, favorites and progress with the backup?'))) return;
     Object.assign(Store.state, o.state);
     Store.state.settings = Object.assign({ liveFmt: 'auto' }, o.state.settings);
     Store.state.settings.sort = Object.assign({ live: 0, movies: 1, series: 1 }, (o.state.settings || {}).sort);
@@ -400,9 +408,9 @@ const Updater = {
   async check(silent) {
     try {
       const r = await native.updateCheck();
-      if (!r.newer) { if (!silent) toast(r.cur ? 'You have the newest version (build ' + r.cur + ')' : 'Update check works in the installed app only'); return; }
+      if (!r.newer) { if (!silent) toast(r.cur ? trf('You have the newest version (build {0})', r.cur) : tr('Update check works in the installed app only')); return; }
       const m = modal(h('div', { class: 'card form' }, h('h3', { text: 'New version available' }),
-        h('div', { text: 'Build ' + r.n + ' is ready (you have build ' + r.cur + ').' }),
+        h('div', { text: trf('Build {0} is ready (you have build {1}).', r.n, r.cur) }),
         h('div', { class: 'acts' },
           h('button', { class: 'btn ghost', text: 'Later', onclick: () => m.close() }),
           h('button', { class: 'btn', text: r.url ? 'Update now' : 'Open download page', onclick: async () => {
