@@ -37,14 +37,16 @@ function createBrowse(kind) {
   });
   function buildCats() {
     const d = S.data;
-    catRows = [{ k: '*all*', name: 'All', count: d.items.length }, { k: '*fav*', name: 'Favorite', count: S.favCount }];
+    const blk = Store.user(S.list).hide[kind].length || Store.user(S.list).lock[kind].length ? Parental.blocked(S.list, kind) : null;
+    catRows = [{ k: '*all*', name: 'All', count: blk && blk.size ? d.items.reduce((n, it) => n + (blk.has(it.g) ? 0 : 1), 0) : d.items.length }, { k: '*fav*', name: 'Favorite', count: S.favCount }];
     catRows.push({ k: '*rec*', name: 'Recently watched', count: recIds().length });
-    let cats = d.cats.slice();
+    const hid = new Set(Store.user(S.list).hide[kind]);
+    let cats = d.cats.filter(c => !hid.has(c.name));
     const m = Store.state.settings.sort[kind] || 0;
     const az = isLive ? m === 1 : m === 2, za = isLive ? m === 2 : m === 3;
     if (az || za) { cats.forEach(c => c._k = c._k || sortKey(c.name)); cats.sort((a, b) => (za ? -1 : 1) * collator.compare(a._k, b._k)); }
     cats = cats.filter(c => S.favCats.has(c.name)).concat(cats.filter(c => !S.favCats.has(c.name)));   // favorite categories first
-    for (const c of cats) catRows.push({ k: c.name, name: c.name, count: c.count });
+    for (const c of cats) catRows.push({ k: c.name, name: (Parental.isLocked(S.list, kind, c.name) ? '🔒 ' : '') + c.name, count: c.count });
     catList.setCount(catRows.length, true);
   }
   const recIds = () => isLive ? Store.user(S.list).recent : (Store.user(S.list).recentVod[kind] || []);
@@ -52,6 +54,10 @@ function createBrowse(kind) {
     S.favCount = S.data.items.reduce((n, it) => n + ((S.favSet.has(it.i) || S.favCats.has(it.g)) ? 1 : 0), 0);
   }
   function pickCat(k) {
+    if (!k.startsWith('*') && Parental.isLocked(S.list, kind, k)) {
+      Parental.askPin(() => { Parental.unlocked.add(Parental.key(S.list, kind, k)); buildCats(); pickCat(k); });
+      return;
+    }
     S.cat = k; S.q = ''; search.value = '';
     refreshShown(); catList.refresh(true);
   }
@@ -65,11 +71,13 @@ function createBrowse(kind) {
   // ----- items
   function baseItems() {
     const d = S.data;
-    if (S.cat === '*all*') return d.items;
-    if (S.cat === '*fav*') return d.items.filter(it => S.favSet.has(it.i) || S.favCats.has(it.g));
+    const bl = Store.user(S.list).hide[kind].length || Store.user(S.list).lock[kind].length ? Parental.blocked(S.list, kind) : null;
+    const ok = (it) => !bl || !bl.has(it.g);
+    if (S.cat === '*all*') return bl && bl.size ? d.items.filter(ok) : d.items;
+    if (S.cat === '*fav*') return d.items.filter(it => ok(it) && (S.favSet.has(it.i) || S.favCats.has(it.g)));
     if (S.cat === '*rec*') {
       const map = new Map(d.items.map(i => [String(i.i), i]));
-      return recIds().map(id => map.get(String(id))).filter(Boolean);
+      return recIds().map(id => map.get(String(id))).filter(Boolean).filter(ok);
     }
     return d.byCat.get(S.cat) || [];
   }
