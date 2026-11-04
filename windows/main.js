@@ -5,6 +5,7 @@ const fs = require('fs');
 const UA = 'VLC/3.0.18 LibVLC/3.0.18';
 let win = null;
 
+app.commandLine.appendSwitch('enable-blink-features', 'AudioVideoTracks');   // lets a movie with several audio languages switch between them
 if (!app.requestSingleInstanceLock()) { app.quit(); }
 app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
 
@@ -125,6 +126,16 @@ ipcMain.handle('doh:set', (_e, mode) => {
   fs.writeFileSync(dohFile(), JSON.stringify({ mode }));
   applyDoh(mode);
   return mode;
+});
+
+// ---------- subtitle file (.srt / .vtt), Arabic files saved as Windows-1256 are read too ----------
+ipcMain.handle('sub:open', async () => {
+  const r = await dialog.showOpenDialog(win, { title: 'Choose a subtitle file', properties: ['openFile'], filters: [{ name: 'Subtitles', extensions: ['srt', 'vtt'] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const buf = await fs.promises.readFile(r.filePaths[0]);
+  let text;
+  try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { text = new TextDecoder('windows-1256').decode(buf); }
+  return { name: path.basename(r.filePaths[0]), text };
 });
 
 // ---------- backup / restore ----------
