@@ -38,7 +38,7 @@ function createBrowse(kind) {
   function buildCats() {
     const d = S.data;
     catRows = [{ k: '*all*', name: 'All', count: d.items.length }, { k: '*fav*', name: 'Favorite', count: S.favCount }];
-    if (isLive) catRows.push({ k: '*rec*', name: 'Recently watched', count: Store.user(S.list).recent.length });
+    catRows.push({ k: '*rec*', name: 'Recently watched', count: recIds().length });
     let cats = d.cats.slice();
     const m = Store.state.settings.sort[kind] || 0;
     const az = isLive ? m === 1 : m === 2, za = isLive ? m === 2 : m === 3;
@@ -47,6 +47,7 @@ function createBrowse(kind) {
     for (const c of cats) catRows.push({ k: c.name, name: c.name, count: c.count });
     catList.setCount(catRows.length, true);
   }
+  const recIds = () => isLive ? Store.user(S.list).recent : (Store.user(S.list).recentVod[kind] || []);
   function computeFavCount() {
     S.favCount = S.data.items.reduce((n, it) => n + ((S.favSet.has(it.i) || S.favCats.has(it.g)) ? 1 : 0), 0);
   }
@@ -68,7 +69,7 @@ function createBrowse(kind) {
     if (S.cat === '*fav*') return d.items.filter(it => S.favSet.has(it.i) || S.favCats.has(it.g));
     if (S.cat === '*rec*') {
       const map = new Map(d.items.map(i => [String(i.i), i]));
-      return Store.user(S.list).recent.map(id => map.get(String(id))).filter(Boolean);
+      return recIds().map(id => map.get(String(id))).filter(Boolean);
     }
     return d.byCat.get(S.cat) || [];
   }
@@ -118,6 +119,7 @@ function createBrowse(kind) {
       row.append(h('div', { class: 'poster', onclick: () => Detail.open(kind, it, { fav: () => S.favSet.has(it.i), toggleFav: () => toggleFav(it) }) },
         h('div', { class: 'im', style: it.p ? { backgroundImage: `url("${it.p.replace(/"/g, '%22')}")` } : {} },
           S.favSet.has(it.i) ? h('span', { class: 'fv', text: '★' }) : null,
+          (!isLive && kind === 'movies' && (Store.state.resume[Urls.movie(S.list, it)] || [])[1] === 0) ? h('span', { class: 'wt', text: '✓', title: 'Watched' }) : null,
           it.r > 0 ? h('span', { class: 'rt', text: '★ ' + (it.r > 5 ? (it.r / 2).toFixed(1) : it.r.toFixed(1)) }) : null),
         h('div', { class: 'nm', dir: 'auto', text: it.n })));
     }
@@ -174,7 +176,7 @@ function createBrowse(kind) {
     engine.live(Urls.live(S.list, it), {
       playing: () => msgEl.classList.add('hidden'),
       status: (m) => { msgEl.textContent = m; msgEl.classList.remove('hidden'); },
-      error: (m) => { msgEl.textContent = m; msgEl.classList.remove('hidden'); }
+      error: (m) => { msgEl.textContent = m; msgEl.classList.remove('hidden'); AppLog.add('live', it.n + ' | ' + m); }
     });
   }
   function select(it, scroll) {
