@@ -2,7 +2,17 @@
 /** Plays live streams (HLS first, MPEG-TS fallback) and files (mp4 / mkv ...) in a <video> element. */
 class Engine {
   constructor(video) {
-    this.v = video; this.hls = null; this.ts = null; this.token = 0; this.lost = 0; this.last = null;
+    this.v = video; this.hls = null; this.ts = null; this.token = 0; this.lost = 0; this.last = null; this.stallT = 0;
+    video.addEventListener('playing', () => KeepAwake.set(this, true));
+    video.addEventListener('pause', () => KeepAwake.set(this, false));
+  }
+  /** What the server answers for a link (HTTP status, 0 = no answer): tells a refused login from a lost connection. */
+  async probe(url) {
+    try {
+      const r = await fetch(url, { headers: { Range: 'bytes=0-0' } });
+      try { if (r.body) r.body.cancel(); } catch (e) { }
+      return r.status;
+    } catch (e) { return 0; }
   }
   stopEngines() {
     if (this.hls) { try { this.hls.destroy(); } catch (e) { } this.hls = null; }
@@ -11,8 +21,10 @@ class Engine {
   stop() {
     this.token++;
     this.stopEngines();
+    clearTimeout(this.stallT);
+    KeepAwake.set(this, false);
     const v = this.v;
-    try { v.onerror = null; v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { }
+    try { v.onerror = null; v.onwaiting = null; v.onplaying = null; v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { }
   }
   /** urls = {m3u8, ts} (Xtream) or {direct} (M3U). cb = {playing(type), error(msg), status(msg)} */
   live(urls, cb) {
@@ -90,26 +102,48 @@ class Engine {
     };
     step(0);
   }
-  /** Plain file (movie / episode). cb = {error(msg), ready(), ended()} */
+  /** Plain file (movie / episode). cb = {error(msg), ready(), status(msg)}. A dropped connection reconnects at the same minute. */
   vod(url, startAt, cb) {
     const my = ++this.token;
     this.stopEngines();
+    clearTimeout(this.stallT);
     const v = this.v;
-    v.onerror = null;
-    v.src = url;
-    const onMeta = () => {
-      v.removeEventListener('loadedmetadata', onMeta);
-      if (my !== this.token) return;
-      if (startAt > 20 && v.duration && startAt < v.duration - 45) v.currentTime = startAt;
-      cb.ready && cb.ready();
+    let tries = 0, resumeAt = startAt || 0;
+    const ok = () => my === this.token;
+    const start = (at) => {
+      resumeAt = at;
+      v.src = url;
+      const onMeta = () => {
+        v.removeEventListener('loadedmetadata', onMeta);
+        if (!ok()) return;
+        if (resumeAt > 20 && v.duration && resumeAt < v.duration - 45) v.currentTime = resumeAt;
+        cb.ready && cb.ready();
+      };
+      v.addEventListener('loadedmetadata', onMeta);
+      v.play().catch(() => { });
     };
-    v.addEventListener('loadedmetadata', onMeta);
-    v.onerror = () => {
-      if (my !== this.token) return;
-      const e = v.error;
-      const why = e && e.code === 4 ? 'Format not supported or the server refused the link (HTTP 401 / 403 / 404).' : (e && e.message) || 'Playback error';
-      cb.error && cb.error(why);
+    const reconnect = async (why) => {
+      if (!ok()) return;
+      const at = v.currentTime || resumeAt;
+      const code = await this.probe(url);
+      if (!ok()) return;
+      if (code >= 400 && code < 500) {            // the server refused: asking again only makes it worse
+        AppLog.add('vod', 'HTTP ' + code + ' | ' + url);
+        cb.error && cb.error('The server refused the link (HTTP ' + code + ').' + (code === 401 || code === 403 ? ' The account may be in use on another device, a VPN may be blocked, or this title is not in your package.' : ''));
+        return;
+      }
+      if (tries >= 6) { AppLog.add('vod', 'gave up after 6 reconnects | ' + url); cb.error && cb.error('Connection lost. Go back and open it again.'); return; }
+      tries++;
+      AppLog.add('vod', 'reconnect #' + tries + ' (' + why + ') at ' + Math.floor(at) + ' s');
+      cb.status && cb.status('Connection lost, reconnecting (' + tries + '/6)...');
+      setTimeout(() => { if (ok()) start(at); }, 1500 * tries);
     };
-    v.play().catch(() => { });
+    v.onerror = () => { if (ok()) reconnect('error ' + ((v.error && v.error.code) || '')); };
+    v.onwaiting = () => {                          // frozen for 20 s without an error: reconnect too
+      clearTimeout(this.stallT);
+      this.stallT = setTimeout(() => { if (ok() && v.readyState < 3 && !v.paused) reconnect('stalled'); }, 20000);
+    };
+    v.onplaying = () => { clearTimeout(this.stallT); tries = 0; };
+    start(resumeAt);
   }
 }
