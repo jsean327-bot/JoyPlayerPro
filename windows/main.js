@@ -102,6 +102,60 @@ ipcMain.handle('m3u:load', async (_e, url) => {
   return parseM3u(text);
 });
 
+// ---------- XMLTV program guide for M3U playlists ----------
+const xmltvCache = new Map();   // url -> { t, progs: Map(channelId -> [[start,end,title,desc]]), names: Map(lower display-name -> channelId) }
+function xmlDec(s) {
+  return String(s || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (m, e) => {
+    e = e.toLowerCase();
+    if (e === 'amp') return '&'; if (e === 'lt') return '<'; if (e === 'gt') return '>'; if (e === 'quot') return '"'; if (e === 'apos') return "'";
+    const c = e[1] === 'x' ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10);
+    try { return String.fromCodePoint(c); } catch { return ''; }
+  }).trim();
+}
+function xmlTime(s) {
+  const m = /^(\d{4})(\d\d)(\d\d)(\d\d)(\d\d)(\d\d)?\s*([+-]\d{4})?/.exec(String(s || '').trim());
+  if (!m) return 0;
+  let t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0));
+  if (m[7]) { const sg = m[7][0] === '-' ? -1 : 1; t -= sg * ((+m[7].slice(1, 3)) * 60 + (+m[7].slice(3, 5))) * 60000; }
+  return Math.floor(t / 1000);
+}
+async function loadXmltv(url) {
+  const hit = xmltvCache.get(url);
+  if (hit && Date.now() - hit.t < 3 * 3600e3) return hit;
+  const res = await getText(url);
+  let buf = Buffer.from(await res.arrayBuffer());
+  if (buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b) buf = require('zlib').gunzipSync(buf);
+  const xml = buf.toString('utf8');
+  const names = new Map(), progs = new Map();
+  const lo = Date.now() / 1000 - 8 * 3600, hi = Date.now() / 1000 + 3 * 86400;
+  let m;
+  const rc = /<channel\s+id="([^"]*)"[^>]*>([\s\S]*?)<\/channel>/g;
+  while ((m = rc.exec(xml))) {
+    const id = xmlDec(m[1]), rn = /<display-name[^>]*>([\s\S]*?)<\/display-name>/g; let n;
+    while ((n = rn.exec(m[2]))) names.set(xmlDec(n[1]).toLowerCase(), id);
+  }
+  const rp = /<programme\s+([^>]*)>([\s\S]*?)<\/programme>/g;
+  while ((m = rp.exec(xml))) {
+    const a = m[1];
+    const st = xmlTime((/start="([^"]*)"/.exec(a) || [])[1]), en = xmlTime((/stop="([^"]*)"/.exec(a) || [])[1]);
+    const ch = xmlDec((/channel="([^"]*)"/.exec(a) || [])[1]);
+    if (!st || !en || !ch || en < lo || st > hi) continue;
+    const t = /<title[^>]*>([\s\S]*?)<\/title>/.exec(m[2]), d = /<desc[^>]*>([\s\S]*?)<\/desc>/.exec(m[2]);
+    let arr = progs.get(ch); if (!arr) progs.set(ch, arr = []);
+    arr.push([st, en, xmlDec(t && t[1]), xmlDec(d && d[1]).slice(0, 500)]);
+  }
+  for (const a of progs.values()) a.sort((x, y) => x[0] - y[0]);
+  const v = { t: Date.now(), progs, names };
+  xmltvCache.set(url, v);
+  if (xmltvCache.size > 3) xmltvCache.delete(xmltvCache.keys().next().value);
+  return v;
+}
+ipcMain.handle('xmltv:get', async (_e, url, id, name) => {
+  const g = await loadXmltv(url);
+  const key = (id && g.progs.has(id)) ? id : (g.names.get(String(name || '').toLowerCase()) || id);
+  return (g.progs.get(key) || []).map(p => ({ start: p[0], end: p[1], title: p[2], desc: p[3] }));
+});
+
 // ---------- keep the screen awake while something plays ----------
 let blockerId = null;
 ipcMain.handle('power:awake', (_e, on) => {
