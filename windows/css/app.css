@@ -184,3 +184,28 @@ body.fs #nav{display:none}
 .grow.past .gtt{color:var(--muted)}
 .grow.now{background:linear-gradient(90deg,var(--burg),transparent)}
 .grow .gdesc{padding:0 12px 10px 78px;color:var(--muted);font-size:13px;line-height:1.5}
+
+/* player controls */
+.cb{background:rgba(255,255,255,.1);border:0;color:#fff;border-radius:8px;padding:7px 11px;cursor:pointer;font-size:15px;white-space:nowrap}
+.cb:hover,.cb:focus-visible{background:rgba(255,255,255,.22);outline:none}
+.cb.big{font-size:19px;padding:7px 16px;background:var(--blue)}
+.sp{flex:1}
+input[type=range]{-webkit-appearance:none;appearance:none;background:transparent;height:20px;margin:0;cursor:pointer}
+input[type=range]::-webkit-slider-runnable-track{height:5px;border-radius:3px;background:linear-gradient(to right,var(--blue) var(--p,0%),rgba(255,255,255,.45) var(--p,0%),rgba(255,255,255,.45) var(--b,0%),rgba(255,255,255,.18) var(--b,0%))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#fff;margin-top:-4.5px}
+input.vol{width:90px;--p:100%;--b:100%}
+#vod .ctl{position:absolute;left:0;right:0;bottom:0;padding:26px 18px 14px;background:linear-gradient(transparent,#000d);display:flex;flex-direction:column;gap:6px;transition:opacity .25s;z-index:2}
+#vod .ctl .seek{width:100%}
+#vod .crow,.stage .lbar{display:flex;align-items:center;gap:8px}
+#vod .crow .tm{font-size:13px;color:#dfe6ff;margin:0 8px;font-variant-numeric:tabular-nums}
+#vod.idle .ctl{opacity:0}
+.stage .lbar{display:none;position:absolute;left:0;right:0;bottom:0;padding:26px 18px 14px;background:linear-gradient(transparent,#000d);transition:opacity .25s}
+.stage.theater .lbar{display:flex}
+.stage.theater.idle .lbar{opacity:0}
+#castbar{position:fixed;left:50%;transform:translateX(-50%);top:62px;z-index:95;background:#0d1530;border:1px solid var(--blue);border-radius:12px;padding:10px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 8px 30px #000a;max-width:96vw}
+#castbar .cinfo{min-width:140px;max-width:240px}
+#castbar .cinfo .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#castbar .cinfo .ct{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#castbar .seek{width:200px}
+#castbar .btn{white-space:nowrap}
+#castbar .tm{white-space:nowrap;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
