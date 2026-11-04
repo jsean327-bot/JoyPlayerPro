@@ -147,13 +147,36 @@ function createBrowse(kind) {
     video = engine.v; video.volume = Number(localStorage.getItem('vol') || 1);
     msgEl = h('div', { class: 'msg', text: 'Select a channel' });
     topEl = h('div', { class: 'top' });
-    stage = h('div', { class: 'stage' }, video, msgEl, topEl);
+    const liveMedia = () => { if (!S.sel) { toast('Select a channel first'); return null; } const u = Urls.live(S.list, S.sel); return { url: u.m3u8 || u.direct, title: S.sel.n, live: true, at: 0 }; };
+    const castLive = () => CastUI.pick(liveMedia, { onStart: () => { video.pause(); }, onStop: () => { if (S.sel) playSel(); } });
+    const extLive = () => { const m = liveMedia(); if (m) { video.pause(); CastUI.external(() => m); } };
+    const lPlay = h('button', { class: 'cb big', text: '⏸', title: 'Play / Pause (Space)', onclick: () => { video.paused ? video.play().catch(() => { }) : video.pause(); } });
+    const lMute = h('button', { class: 'cb', text: '🔊', title: 'Mute (M)', onclick: () => { video.muted = !video.muted; } });
+    const lVol = h('input', { type: 'range', class: 'vol', min: 0, max: 100, value: Math.round(video.volume * 100), title: 'Volume' });
+    lVol.addEventListener('input', () => { video.muted = false; video.volume = Number(lVol.value) / 100; localStorage.setItem('vol', String(video.volume)); });
+    video.addEventListener('volumechange', () => { lVol.value = String(Math.round((video.muted ? 0 : video.volume) * 100)); lMute.textContent = video.muted || video.volume === 0 ? '🔇' : (video.volume < 0.5 ? '🔉' : '🔊'); });
+    video.addEventListener('play', () => { lPlay.textContent = '⏸'; });
+    video.addEventListener('pause', () => { lPlay.textContent = '▶'; });
+    const lbar = h('div', { class: 'lbar' },
+      h('button', { class: 'cb', text: '⏮', title: 'Previous channel (←)', onclick: () => zap(-1) }),
+      lPlay,
+      h('button', { class: 'cb', text: '⏭', title: 'Next channel (→)', onclick: () => zap(1) }),
+      h('div', { class: 'sp' }), lMute, lVol,
+      h('button', { class: 'cb', text: '🔊 Audio', onclick: () => VodPlayer.audioMenu(video) }),
+      h('button', { class: 'cb', text: '⤢', title: 'Picture: Fit / Zoom / Stretch (Z)', onclick: () => Fit.cycle() }),
+      h('button', { class: 'cb', text: '😴', title: 'Sleep timer (S)', onclick: () => Sleep.cycle() }),
+      h('button', { class: 'cb', text: '📡', title: 'Cast to TV', onclick: castLive }),
+      h('button', { class: 'cb', text: '🖥', title: 'Open in VLC / another player', onclick: extLive }),
+      h('button', { class: 'cb', text: '✕', title: 'Exit full screen (Esc)', onclick: () => exitTheater() }));
+    stage = h('div', { class: 'stage' }, video, msgEl, topEl, lbar);
     ptitle = h('div', { class: 't', dir: 'auto', text: '' });
     pfav = h('button', { class: 'btn ghost', text: '★ Favorite', onclick: () => { if (S.sel) toggleFav(S.sel); } });
     epgBox = h('div', { class: 'epgbox' });
     const pane = h('div', { class: 'live-pane' }, stage,
       h('div', { class: 'pinfo' }, ptitle, pfav,
         h('button', { class: 'btn ghost', text: '📅 Guide', title: 'Program guide and catch-up', onclick: () => openGuide() }),
+        h('button', { class: 'btn ghost', text: '📡', title: 'Cast to TV', onclick: castLive }),
+        h('button', { class: 'btn ghost', text: '🖥', title: 'Open in VLC / another player', onclick: extLive }),
         h('button', { class: 'btn', text: '⛶ Full screen', onclick: () => enterTheater() })),
       epgBox);
     cols.append(pane);
