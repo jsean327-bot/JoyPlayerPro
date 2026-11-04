@@ -22,6 +22,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+      - name: Stamp the build number into the version (1.0.<run>), the app compares it with the newest release
+        run: npm version 1.0.${{ github.run_number }} --no-git-tag-version --allow-same-version
       - name: Install
         run: npm install --no-audit --no-fund
       - name: Build installer + portable (${{ matrix.arch }})
