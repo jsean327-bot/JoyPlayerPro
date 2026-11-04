@@ -27,8 +27,9 @@ class Engine {
     try { v.onerror = null; v.onwaiting = null; v.onplaying = null; v.pause(); v.removeAttribute('src'); v.load(); } catch (e) { }
   }
   /** urls = {m3u8, ts} (Xtream) or {direct} (M3U). cb = {playing(type), error(msg), status(msg)} */
-  live(urls, cb) {
+  live(urls, cb, again) {
     const my = ++this.token;
+    if (!again) { this.deny = 0; this.lost = 0; }
     this.stopEngines();
     this.last = [urls, cb];
     const v = this.v;
@@ -53,19 +54,31 @@ class Engine {
       const onPlaying = () => {
         if (settled || my !== this.token) return;
         settled = true; clearTimeout(timer); v.removeEventListener('playing', onPlaying);
-        this.lost = 0;
+        this.lost = 0; this.deny = 0;
         cb.playing && cb.playing(type);
       };
       const fail = () => {
         if (my !== this.token) return;
         if (settled) {                       // stream dropped while watching: reconnect a few times
-          if (this.lost++ < 3) setTimeout(() => { if (my === this.token) this.live(urls, cb); }, 1500);
+          if (this.lost++ < 4) { cb.status && cb.status(trf('Connection lost, reconnecting ({0}/6)...', this.lost).replace('/6', '/4')); setTimeout(() => { if (my === this.token) this.live(urls, cb, true); }, 3000 * this.lost); }
           else cb.error && cb.error(tr('The stream stopped.'));
           return;
         }
         settled = true; clearTimeout(timer); v.removeEventListener('playing', onPlaying);
         this.stopEngines();
         step(k + 1);
+      };
+      const refused = (code) => {              // 401 / 403: the server counts the old connection, so more tries at once only make it worse: wait, then ask again
+        if (my !== this.token) return;
+        if (settled) return fail();             // it was playing and then got refused: the normal reconnect handles it
+        settled = true; clearTimeout(timer); v.removeEventListener('playing', onPlaying);
+        this.stopEngines();
+        AppLog.add('live', 'HTTP ' + code + ' | ' + type + ' | try ' + (this.deny + 1));
+        if (++this.deny <= 4) {
+          const wait = 4 * this.deny;
+          cb.status && cb.status(trf('The server refused the connection (HTTP {0}), trying again in {1} s...', code, wait));
+          setTimeout(() => { if (my === this.token) this.live(urls, cb, true); }, wait * 1000);
+        } else cb.error && cb.error(trf('The server refused the connection (HTTP {0}).', code) + ' ' + tr('The account may be in use on another device, or a VPN address is blocked.'));
       };
       const timer = setTimeout(() => { diag.push(type.toUpperCase() + ': no answer in 12 s'); fail(); }, 12000);
       v.addEventListener('playing', onPlaying);
@@ -78,6 +91,7 @@ class Engine {
           hls.on(Hls.Events.ERROR, (_e, d) => {
             if (!d.fatal) return;
             diag.push('HLS: ' + (d.response && d.response.code ? 'HTTP ' + d.response.code : d.details));
+            if (d.response && (d.response.code === 401 || d.response.code === 403)) return refused(d.response.code);
             if (d.type === Hls.ErrorTypes.MEDIA_ERROR && !recovered) { recovered = true; hls.recoverMediaError(); return; }
             fail();
           });
@@ -89,7 +103,7 @@ class Engine {
           const p = mpegts.createPlayer({ type: 'mpegts', isLive: true, url }, { enableWorker: true, liveBufferLatencyChasing: true, lazyLoadMaxDuration: 30 });
           this.ts = p;
           p.attachMediaElement(v);
-          p.on(mpegts.Events.ERROR, (t, detail, info) => { diag.push('TS: ' + (info && info.code ? 'HTTP ' + info.code : detail || t)); fail(); });
+          p.on(mpegts.Events.ERROR, (t, detail, info) => { diag.push('TS: ' + (info && info.code ? 'HTTP ' + info.code : detail || t)); if (info && (info.code === 401 || info.code === 403)) return refused(info.code); fail(); });
           p.load();
           const pr = p.play();
           if (pr && pr.catch) pr.catch(() => { });
