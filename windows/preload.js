@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('native', {
   json: (url) => ipcRenderer.invoke('api:json', url),
   xtList: (base, user, pass, kind) => ipcRenderer.invoke('xt:list', base, user, pass, kind),
   m3u: (url) => ipcRenderer.invoke('m3u:load', url),
+  xmltv: (url, id, name) => ipcRenderer.invoke('xmltv:get', url, id, name),
   fullscreen: (on) => ipcRenderer.invoke('win:fullscreen', on),
   isFullscreen: () => ipcRenderer.invoke('win:isFullscreen'),
   onFullscreen: (cb) => ipcRenderer.on('fs', (_e, v) => cb(v)),
