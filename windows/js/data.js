@@ -30,7 +30,8 @@ const Store = {
     const u = this.state.user[id] || (this.state.user[id] = {});
     u.fav = u.fav || {}; u.favCats = u.favCats || {}; u.recent = u.recent || [];
     u.recentVod = u.recentVod || { movies: [], series: [] };
-    for (const k of ['live', 'movies', 'series']) { u.fav[k] = u.fav[k] || []; u.favCats[k] = u.favCats[k] || []; }
+    u.hide = u.hide || {}; u.lock = u.lock || {};
+    for (const k of ['live', 'movies', 'series']) { u.fav[k] = u.fav[k] || []; u.favCats[k] = u.favCats[k] || []; u.hide[k] = u.hide[k] || []; u.lock[k] = u.lock[k] || []; }
     return u;
   },
   /** Remembers the movies / series opened (newest first) for the "Recently watched" category. */
@@ -146,5 +147,28 @@ const Account = {
   async info(list) {
     if (list.type !== 'xtream') return null;
     return await native.json(Urls.api(list));
+  }
+};
+
+/** Parental control: a PIN, categories that stay hidden, and categories that ask for the PIN (unlocked until the app closes). */
+const Parental = {
+  unlocked: new Set(),
+  hasPin() { return !!Store.state.settings.pin; },
+  askPin(then, title) {
+    const inp = h('input', { type: 'password', inputmode: 'numeric', maxlength: 8, placeholder: '••••', style: { fontSize: '22px', letterSpacing: '6px', textAlign: 'center', width: '100%' } });
+    const err = h('div', { class: 'd', style: { color: '#ff7b8a', minHeight: '18px', marginTop: '6px' } });
+    const go = () => { if (inp.value === Store.state.settings.pin) { m.close(); then(); } else { err.textContent = tr('Wrong PIN'); inp.value = ''; inp.focus(); } };
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); e.stopPropagation(); });
+    const m = modal(h('div', { class: 'card form' }, h('h3', { text: '🔒 ' + tr(title || 'Enter the PIN') }), inp, err,
+      h('div', { class: 'acts' }, h('button', { class: 'btn ghost', text: 'Cancel', onclick: () => m.close() }), h('button', { class: 'btn', text: 'OK', onclick: go }))));
+    setTimeout(() => inp.focus(), 50);
+  },
+  key(list, kind, name) { return list.id + '|' + kind + '|' + name; },
+  isLocked(list, kind, name) { return this.hasPin() && Store.user(list).lock[kind].includes(name) && !this.unlocked.has(this.key(list, kind, name)); },
+  /** categories not to show inside All / Favorite / search */
+  blocked(list, kind) {
+    const u = Store.user(list), s = new Set(u.hide[kind]);
+    if (this.hasPin()) for (const n of u.lock[kind]) if (!this.unlocked.has(this.key(list, kind, n))) s.add(n);
+    return s;
   }
 };
