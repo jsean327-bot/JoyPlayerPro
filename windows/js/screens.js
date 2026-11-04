@@ -18,6 +18,7 @@ const VodPlayer = (() => {
     const resume = (Store.state.resume[c.url] || [0])[0];
     engine.vod(c.url, resume, {
       ready: () => msg.classList.add('hidden'),
+      status: (m) => { msg.textContent = m; msg.classList.remove('hidden'); },
       error: (m) => { msg.textContent = m; msg.classList.remove('hidden'); }
     });
     video.addEventListener('playing', () => msg.classList.add('hidden'));
@@ -64,6 +65,7 @@ const Detail = {
   async open(kind, it, fav) {
     const list = Store.list(); if (!list) return;
     const isSeries = kind === 'series';
+    const playIt = (c) => { Store.pushRecentVod(list, kind, it.i); VodPlayer.open(c); };
     const body = h('div', { class: 'info-body' }, spinner('Loading details...'));
     const favBtn = h('button', { class: 'btn ghost', text: fav.fav ? '' : '', onclick: () => { fav.toggleFav(); upd(); } });
     const upd = () => { favBtn.textContent = fav.fav() ? '★ In favorites' : '☆ Add to favorites'; };
@@ -96,8 +98,8 @@ const Detail = {
       const ext = (data && data.movie_data && data.movie_data.container_extension) || it.e || 'mp4';
       const url = Urls.movie(list, it, ext);
       const rs = resumeOf(url);
-      acts.append(h('button', { class: 'btn', text: rs > 20 ? '▶ Resume ' + fmtTime(rs) : '▶ Watch Now', onclick: () => { m.close(); VodPlayer.open({ title: it.n, url }); } }));
-      if (rs > 20) acts.append(h('button', { class: 'btn ghost', text: '⏮ From start', onclick: () => { delete Store.state.resume[url]; m.close(); VodPlayer.open({ title: it.n, url }); } }));
+      acts.append(h('button', { class: 'btn', text: rs > 20 ? '▶ Resume ' + fmtTime(rs) : '▶ Watch Now', onclick: () => { m.close(); playIt({ title: it.n, url }); } }));
+      if (rs > 20) acts.append(h('button', { class: 'btn ghost', text: '⏮ From start', onclick: () => { delete Store.state.resume[url]; m.close(); playIt({ title: it.n, url }); } }));
     } else {
       const eps = (data && data.episodes) || {};
       const seasons = Array.isArray(eps) ? { 1: eps } : eps;
@@ -124,7 +126,7 @@ const Detail = {
             const idx = flat.findIndex(f => f.e === e);
             const done = (Store.state.resume[flat[idx].url] || [0, 0])[1] === 0 && Store.state.resume[flat[idx].url];
             const rs = resumeOf(flat[idx].url);
-            return h('div', { class: 'ep' + (done ? ' done' : ''), onclick: () => { m.close(); VodPlayer.open(playAt(idx)); } },
+            return h('div', { class: 'ep' + (done ? ' done' : ''), onclick: () => { m.close(); playIt(playAt(idx)); } },
               h('span', { class: 'en', text: (done ? '✓ ' : '') + e.episode_num }),
               h('span', { class: 'et', dir: 'auto', text: e.title || ('Episode ' + e.episode_num) }),
               h('span', { class: 'ed', text: rs > 20 ? 'resume ' + fmtTime(rs) : ((e.info && e.info.duration) || '') }));
@@ -134,7 +136,7 @@ const Detail = {
         let startIdx = 0;
         for (let i = 0; i < flat.length; i++) if (resumeOf(flat[i].url) > 20) { startIdx = i; break; }
         const sf = flat[startIdx];
-        acts.append(h('button', { class: 'btn', text: startIdx > 0 || resumeOf(sf.url) > 20 ? `▶ Continue S${sf.s} E${sf.e.episode_num}` : '▶ Watch Now', onclick: () => { m.close(); VodPlayer.open(playAt(startIdx)); } }));
+        acts.append(h('button', { class: 'btn', text: startIdx > 0 || resumeOf(sf.url) > 20 ? `▶ Continue S${sf.s} E${sf.e.episode_num}` : '▶ Watch Now', onclick: () => { m.close(); playIt(playAt(startIdx)); } }));
         body.append(seasonBar, epList);
         draw();
       }
@@ -250,6 +252,11 @@ function createPlaylists() {
     setTimeout(() => f.name.focus(), 50);
   }
   function field(label, input) { return h('div', { class: 'field' }, h('label', { text: label }), input); }
+  function move(l, d) {
+    const a = Store.state.lists, i = a.indexOf(l), j = i + d;
+    if (i < 0 || j < 0 || j >= a.length) return;
+    [a[i], a[j]] = [a[j], a[i]]; Store.save(); draw();
+  }
   function draw() {
     page.replaceChildren(h('h2', { text: 'Playlists' }));
     const grid = h('div', { class: 'plist' });
@@ -263,6 +270,8 @@ function createPlaylists() {
             for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate();
             toast('Playlist: ' + l.name); draw(); Preload.run();
           } }),
+          h('button', { class: 'btn small ghost', text: '▲', title: 'Move up', onclick: () => move(l, -1) }),
+          h('button', { class: 'btn small ghost', text: '▼', title: 'Move down', onclick: () => move(l, 1) }),
           h('button', { class: 'btn small ghost', text: 'Edit', onclick: () => form(l) }),
           h('button', { class: 'btn small burg', text: 'Delete', onclick: async () => {
             if (!confirm('Delete "' + l.name + '"?')) return;
@@ -290,8 +299,17 @@ function createSettings() {
     const fmt = h('select', {}, h('option', { value: 'auto', text: 'Automatic (HLS, then TS)' }), h('option', { value: 'hls', text: 'HLS (m3u8)' }), h('option', { value: 'ts', text: 'MPEG-TS (.ts)' }));
     fmt.value = S.liveFmt || 'auto';
     fmt.addEventListener('change', () => { S.liveFmt = fmt.value; Store.save(); toast('Saved'); });
+    const dns = h('select', {}, h('option', { value: 0, text: 'Off (system DNS)' }), h('option', { value: 1, text: 'Cloudflare' }), h('option', { value: 2, text: 'Google' }), h('option', { value: 3, text: 'Quad9' }));
+    native.dohGet().then(v => { dns.value = String(v); });
+    dns.addEventListener('change', async () => { await native.dohSet(Number(dns.value)); toast('Secure DNS saved'); });
     page.replaceChildren(h('h2', { text: 'Settings' }),
       row('Live stream format', 'If channels do not start, try the other format.', fmt),
+      row('Secure DNS (DoH)', 'Helps when your provider or router blocks the IPTV server name. If the server still does not open, try another one.', dns),
+      row('Updates', 'Looks for a newer Windows build and installs it.', h('button', { class: 'btn', text: '⬆ Check now', onclick: () => Updater.check(false) })),
+      row('Error Log', 'What failed and what the server answered (passwords are hidden). Send it when something does not play.', h('button', { class: 'btn ghost', text: '🪲 Open', onclick: () => openLog() })),
+      row('Backup & Restore', 'Saves your playlists, favorites and progress to a file (it contains your account passwords: keep it private).', h('div', { style: { display: 'flex', gap: '8px' } },
+        h('button', { class: 'btn ghost', text: '💾 Save', onclick: () => backupSave() }),
+        h('button', { class: 'btn ghost', text: '📂 Restore', onclick: () => backupRestore(draw) }))),
       row('Full screen', 'F11 also works.', h('button', { class: 'btn', text: '⛶ Toggle', onclick: () => native.isFullscreen().then(f => native.fullscreen(!f)) })),
       row('Clear saved lists', 'Deletes the saved copy of the channel / movie / series lists (they are downloaded again).', h('button', { class: 'btn burg', text: 'Clear & reload', onclick: async () => { const l = Store.list(); if (l) { await Content.reload(l); for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate(); toast('Cleared'); Preload.run(); } } })),
       h('div', { class: 'setrow' }, h('div', {}, h('div', { text: 'Keyboard' }),
@@ -300,3 +318,55 @@ function createSettings() {
   function row(t, d, ctrl) { return h('div', { class: 'setrow' }, h('div', {}, h('div', { text: t }), h('div', { class: 'd', text: d })), ctrl); }
   return { el: root, show() { root.classList.remove('hidden'); draw(); }, hide() { root.classList.add('hidden'); }, onKey() { return false; } };
 }
+
+/* ---------------- Error log / backup / updates ---------------- */
+function openLog() {
+  const box = h('div', { class: 'logbox', text: AppLog.text() });
+  const m = modal(h('div', { class: 'card form' }, h('h3', { text: 'Error Log' }), box,
+    h('div', { class: 'acts' },
+      h('button', { class: 'btn ghost', text: 'Close', onclick: () => m.close() }),
+      h('button', { class: 'btn burg', text: 'Clear', onclick: () => { AppLog.clear(); box.textContent = AppLog.text(); } }),
+      h('button', { class: 'btn', text: 'Copy', onclick: () => { navigator.clipboard.writeText(AppLog.text()).then(() => toast('Copied')); } }))));
+}
+async function backupSave() {
+  try {
+    const r = await native.backupExport(JSON.stringify({ app: 'joyplayer-windows', v: 1, state: Store.state }));
+    if (r) toast('Backup saved');
+  } catch (e) { toast('Could not save the backup'); AppLog.add('backup', e.message || e); }
+}
+async function backupRestore(redraw) {
+  try {
+    const t = await native.backupImport();
+    if (!t) return;
+    const o = JSON.parse(t);
+    if (!o || !o.state || !Array.isArray(o.state.lists)) { toast('This is not a JoyPlayer backup'); return; }
+    if (!confirm('Replace the current playlists, favorites and progress with the backup?')) return;
+    Object.assign(Store.state, o.state);
+    Store.state.settings = Object.assign({ liveFmt: 'auto' }, o.state.settings);
+    Store.state.settings.sort = Object.assign({ live: 0, movies: 1, series: 1 }, (o.state.settings || {}).sort);
+    Store.save();
+    for (const v of Object.values(App.views)) if (v.invalidate) v.invalidate();
+    toast('Backup restored'); if (redraw) redraw(); Preload.run();
+  } catch (e) { toast('Could not read the backup'); AppLog.add('backup', e.message || e); }
+}
+const Updater = {
+  async check(silent) {
+    try {
+      const r = await native.updateCheck();
+      if (!r.newer) { if (!silent) toast(r.cur ? 'You have the newest version (build ' + r.cur + ')' : 'Update check works in the installed app only'); return; }
+      const m = modal(h('div', { class: 'card form' }, h('h3', { text: 'New version available' }),
+        h('div', { text: 'Build ' + r.n + ' is ready (you have build ' + r.cur + ').' }),
+        h('div', { class: 'acts' },
+          h('button', { class: 'btn ghost', text: 'Later', onclick: () => m.close() }),
+          h('button', { class: 'btn', text: r.url ? 'Update now' : 'Open download page', onclick: async () => {
+            if (!r.url) { native.openExternal(r.page); m.close(); return; }
+            toast('Downloading the update...', 6000);
+            try {
+              const how = await native.updateInstall(r.url, r.name, r.portable);
+              toast(how === 'folder' ? 'Downloaded: close this window and run the new file' : 'Starting the installer...', 5000);
+              m.close();
+            } catch (e) { AppLog.add('update', e.message || e); toast('Download failed: opening the page instead'); native.openExternal(r.page); }
+          } }))));
+    } catch (e) { AppLog.add('update', e.message || e); if (!silent) toast('Could not check for updates'); }
+  }
+};
