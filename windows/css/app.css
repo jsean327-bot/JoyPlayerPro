@@ -7,6 +7,8 @@ html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-famil
 body{background:radial-gradient(1200px 700px at 15% 0%,#1b2a66 0%,transparent 60%),radial-gradient(900px 600px at 100% 100%,#5a1030 0%,transparent 55%),var(--bg)}
 #app{display:flex;flex-direction:column;height:100vh}
 button,input,select{font:inherit;color:inherit}
+select{background:#0b1230;border:1px solid var(--line);border-radius:8px;padding:6px 8px}
+select option{background:#0b1230;color:#e8ecff}
 button{cursor:pointer}
 ::-webkit-scrollbar{width:10px;height:10px}
 ::-webkit-scrollbar-thumb{background:#2c3d7a;border-radius:6px}
