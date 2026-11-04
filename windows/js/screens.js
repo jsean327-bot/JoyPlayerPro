@@ -50,15 +50,18 @@ const VodPlayer = (() => {
     native.fullscreen(true);
     engine = new Engine(video);
     const resume = (Store.state.resume[c.url] || [0])[0];
-    engine.vod(c.url, resume, {
+    const cbs = {
       ready: () => msg.classList.add('hidden'),
+      playing: () => msg.classList.add('hidden'),
       status: (m) => { msg.textContent = m; msg.classList.remove('hidden'); },
-      error: (m) => { msg.textContent = m; msg.classList.remove('hidden'); }
-    });
+      error: (m) => { msg.textContent = m; msg.classList.remove('hidden'); if (c.stream) AppLog.add('catchup', m); }
+    };
+    if (c.stream) engine.live({ direct: c.url }, cbs);      // catch-up: a recorded stream, played like a live one
+    else engine.vod(c.url, resume, cbs);
     video.addEventListener('playing', () => msg.classList.add('hidden'));
     video.addEventListener('waiting', () => { msg.textContent = 'Buffering...'; msg.classList.remove('hidden'); });
-    video.addEventListener('ended', () => { Store.saveResume(c.url, 0, 0); if (c.next) playNext(); else close(); });
-    saveT = setInterval(() => { if (video.duration && video.currentTime > 5) Store.saveResume(c.url, video.currentTime, video.duration); }, 8000);
+    video.addEventListener('ended', () => { if (!c.stream) Store.saveResume(c.url, 0, 0); if (c.next) playNext(); else close(); });
+    saveT = setInterval(() => { if (!c.stream && video.duration && video.currentTime > 5) Store.saveResume(c.url, video.currentTime, video.duration); }, 8000);
     el.addEventListener('mousemove', wake); wake();
   }
   function wake() { if (!el) return; el.classList.remove('idle'); clearTimeout(hideT); hideT = setTimeout(() => el && el.classList.add('idle'), 3200); }
@@ -67,7 +70,7 @@ const VodPlayer = (() => {
     clearInterval(saveT);
     if (el) {
       const v = el.querySelector('video');
-      if (v && ctx && v.duration && v.currentTime > 5 && !v.ended) Store.saveResume(ctx.url, v.currentTime, v.duration);
+      if (v && ctx && !ctx.stream && v.duration && v.currentTime > 5 && !v.ended) Store.saveResume(ctx.url, v.currentTime, v.duration);
       if (engine) engine.stop();
       el.remove(); el = null; engine = null;
       if (!silent) native.fullscreen(false);
