@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('native', {
   castCtl: (cmd, val) => ipcRenderer.invoke('cast:ctl', cmd, val),
   castStop: () => ipcRenderer.invoke('cast:stop'),
   extPlay: (url, title) => ipcRenderer.invoke('ext:play', url, title),
+  netTest: (tests) => ipcRenderer.invoke('net:test', tests),
   xmltv: (url, id, name) => ipcRenderer.invoke('xmltv:get', url, id, name),
   fullscreen: (on) => ipcRenderer.invoke('win:fullscreen', on),
   isFullscreen: () => ipcRenderer.invoke('win:isFullscreen'),
