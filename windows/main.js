@@ -407,7 +407,7 @@ function dohMode() { try { return Number(JSON.parse(fs.readFileSync(dohFile(), '
 function applyDoh(mode) {
   try {
     if (mode && DOH[mode]) app.configureHostResolver({ secureDnsMode: 'automatic', secureDnsServers: [DOH[mode]] });   // automatic = falls back to the normal DNS
-    else app.configureHostResolver({ secureDnsMode: 'off', secureDnsServers: [] });
+    // off: leave Windows' own DNS alone (calling configureHostResolver here switched Chromium to its built-in resolver, which cannot read some VPN / adapter DNS settings -> ERR_NAME_NOT_RESOLVED)
   } catch {}
 }
 ipcMain.handle('doh:get', () => dohMode());
