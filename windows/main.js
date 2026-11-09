@@ -376,6 +376,22 @@ ipcMain.handle('ext:play', async (_e, url, title) => {
   } catch (e) { return { ok: false, error: String(e && e.message || e) }; }
 });
 
+// ---------- connection test (Settings) ----------
+ipcMain.handle('net:test', async (_e, tests) => {
+  const out = [];
+  for (const t of tests) {
+    const t0 = Date.now(), c = new AbortController(), to = setTimeout(() => c.abort(), 9000);
+    try {
+      const res = await net.fetch(t.url, { headers: { 'User-Agent': UA, 'Accept': '*/*' }, signal: c.signal, redirect: 'follow' });
+      let bytes = 0;
+      if (t.read && res.body) { const rd = res.body.getReader(); const r = await rd.read(); bytes = r.value ? r.value.length : 0; try { await rd.cancel(); } catch { } }
+      out.push({ n: t.n, status: res.status, ms: Date.now() - t0, bytes, ct: res.headers.get('content-type') || '' });
+    } catch (e) { out.push({ n: t.n, status: 0, ms: Date.now() - t0, err: String((e && e.cause && e.cause.message) || (e && e.message) || e) }); }
+    clearTimeout(to); try { c.abort(); } catch { }
+  }
+  return out;
+});
+
 // ---------- keep the screen awake while something plays ----------
 let blockerId = null;
 ipcMain.handle('power:awake', (_e, on) => {
