@@ -412,6 +412,7 @@ function createSettings() {
         return sz;
       })()),
       row('Updates', 'Looks for a newer Windows build and installs it.', h('button', { class: 'btn', text: '⬆ Check now', onclick: () => Updater.check(false) })),
+      row('Connection test', 'Checks the connection to your server from this PC and tells what is blocked. Send the result when channels do not play.', h('button', { class: 'btn', text: '🔌 Test', onclick: () => connTest() })),
       row('Error Log', 'What failed and what the server answered (passwords are hidden). Send it when something does not play.', h('button', { class: 'btn ghost', text: '🪲 Open', onclick: () => openLog() })),
       row('Backup & Restore', 'Saves your playlists, favorites and progress to a file (it contains your account passwords: keep it private).', h('div', { style: { display: 'flex', gap: '8px' } },
         h('button', { class: 'btn ghost', text: '💾 Save', onclick: () => backupSave() }),
@@ -481,6 +482,39 @@ function createSettings() {
 }
 
 /* ---------------- Error log / backup / updates ---------------- */
+async function connTest() {
+  const l = Store.list();
+  if (!l) return toast('Add a playlist first');
+  const box = h('div', { class: 'logbox', text: tr('Testing...') });
+  const m = modal(h('div', { class: 'card form' }, h('h3', { text: 'Connection test' }), box,
+    h('div', { class: 'acts' },
+      h('button', { class: 'btn ghost', text: 'Close', onclick: () => m.close() }),
+      h('button', { class: 'btn', text: 'Copy', onclick: () => { navigator.clipboard.writeText(box.textContent).then(() => toast('Copied')); } }))));
+  const lines = [];
+  const show = () => { box.textContent = lines.join('\n'); };
+  const fmt = (r) => r.status ? `HTTP ${r.status} | ${r.ms} ms | ${r.bytes || 0} B ${r.ct || ''}` : `FAILED | ${r.ms} ms | ${r.err}`;
+  const tests = [{ n: 'Public IP address (is a VPN on?)', url: 'https://api.ipify.org', read: true }];
+  if (l.type === 'xtream') {
+    const u = Urls.live(l, { i: (Content.mem[l.id + '_live'] && Content.mem[l.id + '_live'].items[0] || {}).i || 1 });
+    tests.push({ n: 'Account (player_api)', url: Urls.api(l), read: true }, { n: 'Stream m3u8 (main process)', url: u.m3u8, read: true }, { n: 'Stream ts (main process)', url: u.ts, read: true }, { n: 'Stream short form (main process)', url: u.raw, read: true });
+    lines.push('Playlist: ' + l.name + ' | ' + baseOf(l));
+    show();
+    try { for (const r of await native.netTest(tests)) lines.push(r.n + ': ' + fmt(r)); } catch (e) { lines.push('Test failed: ' + (e.message || e)); }
+    show();
+    for (const [n, url] of [['Stream m3u8 (player window)', u.m3u8], ['Stream ts (player window)', u.ts]]) {
+      const t0 = Date.now(), c = new AbortController(), to = setTimeout(() => c.abort(), 9000);
+      try { const r = await fetch(url, { signal: c.signal }); const rd = r.body.getReader(); const x = await rd.read(); lines.push(n + ': HTTP ' + r.status + ' | ' + (Date.now() - t0) + ' ms | ' + ((x.value && x.value.length) || 0) + ' B'); try { c.abort(); } catch (e) { } }
+      catch (e) { lines.push(n + ': FAILED | ' + (Date.now() - t0) + ' ms | ' + (e.name === 'AbortError' ? 'no answer in 9 s' : e.message)); }
+      clearTimeout(to); show();
+    }
+  } else {
+    tests.push({ n: 'Playlist link', url: l.url, read: true });
+    try { for (const r of await native.netTest(tests)) lines.push(r.n + ': ' + fmt(r)); } catch (e) { lines.push('Test failed: ' + (e.message || e)); }
+  }
+  lines.push('', 'Done');
+  show();
+  AppLog.add('nettest', lines.join(' / '));
+}
 function openLog() {
   const box = h('div', { class: 'logbox', text: AppLog.text() });
   const m = modal(h('div', { class: 'card form' }, h('h3', { text: 'Error Log' }), box,
